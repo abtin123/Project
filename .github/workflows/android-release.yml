@@ -31,6 +31,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free disk space
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "== Before cleanup =="
+          df -h /
+
+          # نرم‌افزارهای preinstall حجیم که این پروژه (Flutter/Android) بهشون نیاز نداره
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/local/lib/node_modules
+          sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/local/.ghcup
+
+          # SDK Toolهای زبان‌های دیگر که استفاده نمی‌شوند (Go, پایتون اضافه، و ...)
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+          # امولاتور و system-image های پیش‌فرض اندروید؛ این پروژه فقط از
+          # platform/build-tools/ndk/cmake استفاده می‌کند که در استپ بعدی
+          # با sdkmanager دوباره/تازه نصب می‌شوند
+          sudo rm -rf /usr/local/lib/android/sdk/system-images
+          sudo rm -rf /usr/local/lib/android/sdk/emulator
+          sudo rm -rf /usr/local/lib/android/sdk/ndk
+
+          # Docker images پیش‌فرض runner
+          sudo docker image prune --all --force 2>/dev/null || true
+          sudo docker builder prune --all --force 2>/dev/null || true
+
+          # پکیج‌های apt حجیم و بلااستفاده
+          sudo apt-get remove -y '^aspnetcore-.*' '^dotnet-.*' '^llvm-.*' 'php.*' \
+            '^mongodb-.*' '^mysql-.*' azure-cli google-chrome-stable firefox \
+            powershell mono-devel libgl1-mesa-dri google-cloud-cli --fix-missing -qq >/dev/null 2>&1 || true
+          sudo apt-get autoremove -y -qq >/dev/null 2>&1 || true
+          sudo apt-get clean
+
+          echo "== After cleanup =="
+          df -h /
+
       - name: Extract one clean Flutter source tree
         shell: bash
         run: |
