@@ -4,19 +4,22 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Git tag for this signed APK, for example v1.0.0
+        description: Git tag for this signed APK/AAB, for example v1.0.0
         required: true
         type: string
+
       release_name:
         description: Visible GitHub Release title
         required: false
         type: string
+
       source_zip:
         description: Path to the source ZIP inside the repository (leave empty to auto-detect the only ZIP in the repo)
         required: false
         type: string
+
       artifact_name:
-        description: Base name for the built APK/asset (defaults to the app name from pubspec.yaml)
+        description: Base name for the built APK/AAB (defaults to the app name from pubspec.yaml)
         required: false
         type: string
 
@@ -25,20 +28,32 @@ permissions:
 
 jobs:
   release:
-    name: Build signed APK from source ZIP
+    name: Build signed APK and AAB from source ZIP
     runs-on: ubuntu-latest
     timeout-minutes: 60
+
     steps:
+
+      # ============================================================
+      # CHECKOUT
+      # ============================================================
+
       - uses: actions/checkout@v4
+
+
+      # ============================================================
+      # FREE DISK SPACE
+      # ============================================================
 
       - name: Free disk space
         shell: bash
         run: |
           set -euo pipefail
+
           echo "== Before cleanup =="
           df -h /
 
-          # نرم‌افزارهای preinstall حجیم که این پروژه (Flutter/Android) بهشون نیاز نداره
+          # حجیم‌های غیرضروری
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
           sudo rm -rf /opt/hostedtoolcache/CodeQL
@@ -47,152 +62,401 @@ jobs:
           sudo rm -rf /usr/share/swift
           sudo rm -rf /usr/local/.ghcup
 
-          # SDK Toolهای زبان‌های دیگر که استفاده نمی‌شوند (Go, پایتون اضافه، و ...)
+          # ابزارهای زبان‌های دیگر
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
-          # امولاتور و system-image های پیش‌فرض اندروید؛ این پروژه فقط از
-          # platform/build-tools/ndk/cmake استفاده می‌کند که در استپ بعدی
-          # با sdkmanager دوباره/تازه نصب می‌شوند
+          # Android emulator و system images
           sudo rm -rf /usr/local/lib/android/sdk/system-images
           sudo rm -rf /usr/local/lib/android/sdk/emulator
           sudo rm -rf /usr/local/lib/android/sdk/ndk
 
-          # Docker images پیش‌فرض runner
+          # Docker
           sudo docker image prune --all --force 2>/dev/null || true
           sudo docker builder prune --all --force 2>/dev/null || true
 
-          # پکیج‌های apt حجیم و بلااستفاده
-          sudo apt-get remove -y '^aspnetcore-.*' '^dotnet-.*' '^llvm-.*' 'php.*' \
-            '^mongodb-.*' '^mysql-.*' azure-cli google-chrome-stable firefox \
-            powershell mono-devel libgl1-mesa-dri google-cloud-cli --fix-missing -qq >/dev/null 2>&1 || true
+          # پکیج‌های غیرضروری
+          sudo apt-get remove -y \
+            '^aspnetcore-.*' \
+            '^dotnet-.*' \
+            '^llvm-.*' \
+            'php.*' \
+            '^mongodb-.*' \
+            '^mysql-.*' \
+            azure-cli \
+            google-chrome-stable \
+            firefox \
+            powershell \
+            mono-devel \
+            libgl1-mesa-dri \
+            google-cloud-cli \
+            --fix-missing -qq >/dev/null 2>&1 || true
+
           sudo apt-get autoremove -y -qq >/dev/null 2>&1 || true
           sudo apt-get clean
 
           echo "== After cleanup =="
           df -h /
 
+
+      # ============================================================
+      # EXTRACT FLUTTER PROJECT
+      # ============================================================
+
       - name: Extract one clean Flutter source tree
         shell: bash
         run: |
           set -euo pipefail
+
           source_zip='${{ inputs.source_zip }}'
+
           if [ -z "$source_zip" ]; then
-            mapfile -t found_zips < <(find . -maxdepth 4 -type f -iname '*.zip' -not -path '*/.git/*' | sort)
-            test "${#found_zips[@]}" -ge 1 || { echo 'No ZIP file found in the repository.'; exit 1; }
+            mapfile -t found_zips < <(
+              find . \
+                -maxdepth 4 \
+                -type f \
+                -iname '*.zip' \
+                -not -path '*/.git/*' \
+                | sort
+            )
+
+            test "${#found_zips[@]}" -ge 1 || {
+              echo 'No ZIP file found in the repository.'
+              exit 1
+            }
+
             test "${#found_zips[@]}" -eq 1 || {
               echo "Multiple ZIP files found; pass source_zip explicitly:"
               printf '  %s\n' "${found_zips[@]}"
               exit 1
             }
+
             source_zip="${found_zips[0]#./}"
-            echo "Auto-detected source ZIP: $source_zip"
+
+            echo "Auto-detected source ZIP:"
+            echo "$source_zip"
           fi
+
           case "$source_zip" in
             ''|/*|*'..'*)
               echo 'source_zip must be a relative path inside the repository.'
               exit 1
               ;;
           esac
-          test -s "$source_zip" || { echo "Missing source ZIP: $source_zip"; exit 1; }
+
+          test -s "$source_zip" || {
+            echo "Missing source ZIP: $source_zip"
+            exit 1
+          }
+
+          # جلوگیری از ZIP Slip
           if unzip -Z1 "$source_zip" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
             echo 'Unsafe path found in source ZIP.'
             exit 1
           fi
+
           unpack_dir="$RUNNER_TEMP/source-unpacked"
+
           rm -rf "$unpack_dir"
           mkdir -p "$unpack_dir"
+
           unzip -q "$source_zip" -d "$unpack_dir"
-          mapfile -t roots < <(find "$unpack_dir" -mindepth 1 -maxdepth 2 -type f -name pubspec.yaml -printf '%h\n' | sort -u)
+
+          mapfile -t roots < <(
+            find "$unpack_dir" \
+              -mindepth 1 \
+              -maxdepth 2 \
+              -type f \
+              -name pubspec.yaml \
+              -printf '%h\n' \
+              | sort -u
+          )
+
           test "${#roots[@]}" -eq 1 || {
             echo "Expected one Flutter project in source ZIP; found ${#roots[@]}."
             exit 1
           }
+
           app_dir="${roots[0]}"
-          test -f "$app_dir/android/app/build.gradle" || { echo 'Missing Android app build configuration.'; exit 1; }
+
+          test -f "$app_dir/android/app/build.gradle" || {
+            echo 'Missing Android app build configuration.'
+            exit 1
+          }
 
           app_name='${{ inputs.artifact_name }}'
+
           if [ -z "$app_name" ]; then
-            app_name=$(sed -n 's/^name:[[:space:]]*//p' "$app_dir/pubspec.yaml" | head -n1 | tr -d '\r')
-            test -n "$app_name" || { echo 'Could not determine app name from pubspec.yaml; pass artifact_name.'; exit 1; }
+            app_name=$(
+              sed -n 's/^name:[[:space:]]*//p' \
+                "$app_dir/pubspec.yaml" \
+                | head -n1 \
+                | tr -d '\r'
+            )
+
+            test -n "$app_name" || {
+              echo 'Could not determine app name from pubspec.yaml.'
+              echo 'Pass artifact_name manually.'
+              exit 1
+            }
           fi
 
           echo "APP_DIR=$app_dir" >> "$GITHUB_ENV"
           echo "APP_NAME=$app_name" >> "$GITHUB_ENV"
-          echo "Building from extracted source directory: $app_dir (artifact name: $app_name)"
+
+          echo "=========================================="
+          echo "Flutter project:"
+          echo "$app_dir"
+          echo "Artifact name:"
+          echo "$app_name"
+          echo "=========================================="
+
+
+      # ============================================================
+      # JAVA
+      # ============================================================
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
 
+
+      # ============================================================
+      # ANDROID SDK
+      # ============================================================
+
       - name: Install required Android SDK components
         shell: bash
         run: |
           set -euo pipefail
+
           sdkmanager="${ANDROID_HOME:?ANDROID_HOME is not set}/cmdline-tools/latest/bin/sdkmanager"
-          test -x "$sdkmanager" || { echo 'Android SDK command-line tools are unavailable.'; exit 1; }
+
+          test -x "$sdkmanager" || {
+            echo 'Android SDK command-line tools are unavailable.'
+            exit 1
+          }
+
           set +o pipefail
           yes | "$sdkmanager" --licenses >/dev/null
           sdkmanager_status=${PIPESTATUS[1]}
           set -o pipefail
-          test "$sdkmanager_status" -eq 0 || { echo 'Android SDK license acceptance failed.'; exit 1; }
-          "$sdkmanager" 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+
+          test "$sdkmanager_status" -eq 0 || {
+            echo 'Android SDK license acceptance failed.'
+            exit 1
+          }
+
+          "$sdkmanager" \
+            'platforms;android-36' \
+            'build-tools;36.0.0' \
+            'ndk;28.2.13676358' \
+            'cmake;3.22.1'
+
+
+      # ============================================================
+      # FLUTTER
+      # ============================================================
 
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.35.1'
           cache: true
 
+
+      # ============================================================
+      # VERSION INFORMATION
+      # ============================================================
+
+      - name: Show Flutter and Android versions
+        working-directory: ${{ env.APP_DIR }}
+        shell: bash
+        run: |
+          flutter --version
+          flutter doctor -v
+
+
+      # ============================================================
+      # PUB GET
+      # ============================================================
+
       - name: Fetch Flutter packages from extracted source
         working-directory: ${{ env.APP_DIR }}
         run: flutter pub get
 
+
+      # ============================================================
+      # ANALYZE
+      # ============================================================
+
       - name: Analyze source
         working-directory: ${{ env.APP_DIR }}
-        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+        run: |
+          flutter analyze \
+            --no-fatal-warnings \
+            --no-fatal-infos
+
+
+      # ============================================================
+      # TESTS
+      # ============================================================
 
       - name: Run nonvisual tests
         working-directory: ${{ env.APP_DIR }}
         shell: bash
         run: |
           set -euo pipefail
+
           if [ -d test ]; then
-            mapfile -t tests < <(find test -type f -name '*_test.dart' ! -path 'test/visual/*' | sort)
+            mapfile -t tests < <(
+              find test \
+                -type f \
+                -name '*_test.dart' \
+                ! -path 'test/visual/*' \
+                | sort
+            )
           else
             tests=()
           fi
+
           if [ "${#tests[@]}" -eq 0 ]; then
             echo 'No nonvisual tests were found; skipping test step.'
           else
             flutter test --no-pub "${tests[@]}"
           fi
 
+
+      # ============================================================
+      # BUILD APK
+      # ============================================================
+
       - name: Build signed release APK
         working-directory: ${{ env.APP_DIR }}
-        run: flutter build apk --release --no-pub
+        run: |
+          set -euo pipefail
 
-      - name: Compress signed APK for download
-        id: package_apk
+          flutter build apk \
+            --release \
+            --no-pub
+
+
+      # ============================================================
+      # BUILD AAB
+      # ============================================================
+
+      - name: Build signed release AAB
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+
+          flutter build appbundle \
+            --release \
+            --no-pub
+
+
+      # ============================================================
+      # VERIFY + ZIP APK AND AAB
+      # ============================================================
+
+      - name: Compress APK and AAB
+        id: package_release
         working-directory: ${{ env.APP_DIR }}
         shell: bash
         run: |
           set -euo pipefail
-          apk='build/app/outputs/flutter-apk/app-release.apk'
-          test -s "$apk" || { echo 'Signed APK was not produced.'; exit 1; }
+
+          apk="build/app/outputs/flutter-apk/app-release.apk"
+          aab="build/app/outputs/bundle/release/app-release.aab"
+
+          echo "Checking APK..."
+          test -s "$apk" || {
+            echo 'Signed APK was not produced.'
+            exit 1
+          }
+
+          echo "Checking AAB..."
+          test -s "$aab" || {
+            echo 'Signed AAB was not produced.'
+            exit 1
+          }
+
           mkdir -p release
-          cp "$apk" "release/${APP_NAME}-${{ inputs.tag }}.apk"
+
+          apk_name="${APP_NAME}-${{ inputs.tag }}.apk"
+          aab_name="${APP_NAME}-${{ inputs.tag }}.aab"
+
+          apk_zip="${APP_NAME}-${{ inputs.tag }}.apk.zip"
+          aab_zip="${APP_NAME}-${{ inputs.tag }}.aab.zip"
+
+          cp "$apk" "release/$apk_name"
+          cp "$aab" "release/$aab_name"
+
+          echo "Compressing APK..."
+
           (
             cd release
-            zip -9 -q "${APP_NAME}-${{ inputs.tag }}.apk.zip" "${APP_NAME}-${{ inputs.tag }}.apk"
+            zip -9 -q \
+              "$apk_zip" \
+              "$apk_name"
           )
-          asset="$PWD/release/${APP_NAME}-${{ inputs.tag }}.apk.zip"
-          test -s "$asset"
-          echo "asset=$asset" >> "$GITHUB_OUTPUT"
 
-      - name: Publish compressed APK to GitHub Release
+          echo "Compressing AAB..."
+
+          (
+            cd release
+            zip -9 -q \
+              "$aab_zip" \
+              "$aab_name"
+          )
+
+          # فایل‌های خام دیگر لازم نیستند
+          rm -f \
+            "release/$apk_name" \
+            "release/$aab_name"
+
+          test -s "release/$apk_zip" || {
+            echo 'APK ZIP was not produced.'
+            exit 1
+          }
+
+          test -s "release/$aab_zip" || {
+            echo 'AAB ZIP was not produced.'
+            exit 1
+          }
+
+          echo
+          echo "=========================================="
+          echo "FINAL RELEASE FILES"
+          echo "=========================================="
+
+          ls -lh release/
+
+          echo
+          echo "APK ZIP:"
+          echo "$PWD/release/$apk_zip"
+
+          echo
+          echo "AAB ZIP:"
+          echo "$PWD/release/$aab_zip"
+
+          echo
+          echo "=========================================="
+
+          echo "apk_zip=$PWD/release/$apk_zip" >> "$GITHUB_OUTPUT"
+          echo "aab_zip=$PWD/release/$aab_zip" >> "$GITHUB_OUTPUT"
+
+
+      # ============================================================
+      # PUBLISH GITHUB RELEASE
+      # ============================================================
+
+      - name: Publish compressed APK and AAB
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
           name: ${{ inputs.release_name || inputs.tag }}
           generate_release_notes: true
-          files: ${{ steps.package_apk.outputs.asset }}
+
+          files: |
+            ${{ steps.package_release.outputs.apk_zip }}
+            ${{ steps.package_release.outputs.aab_zip }}
