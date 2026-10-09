@@ -1,0 +1,82 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0'
+}
+
+android {
+    namespace "ir.abtin.abtin_maps"
+    compileSdkVersion 36
+    ndkVersion "28.2.13676358"
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    kotlin {
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_21
+        }
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        applicationId "ir.abtin.abtin_maps"
+        // marker فلش داخلی Flutter روی Android به API 24 نیاز دارد.
+        minSdkVersion 24
+        targetSdkVersion 36
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+        // فقط زبان‌ها فیلتر می‌شوند. فیلترِ چگالی (xxhdpi/xxxhdpi) در AGP جدید
+        // منسوخ شده و باعث خطای لینکِ منابع (aapt2) می‌شد.
+        resourceConfigurations += ["fa", "en"]
+    }
+
+    buildTypes {
+        release {
+            // Release builds are deliberately unsigned: keep private signing keys
+            // out of this source package. Sign locally for store distribution.
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+
+    packagingOptions {
+        pickFirst "lib/**/libc++_shared.so"
+        pickFirst "lib/**/libjsc.so"
+    }
+
+}
+
+flutter {
+    source '../..'
+}

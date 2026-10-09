@@ -1,0 +1,45 @@
+AbtinMaps — Cross-platform build guide
+======================================
+
+Project
+- Flutter application; target platforms: Android and iOS.
+- Flutter 3.35.1 stable (Dart 3.9.0) is the version used for this project.
+- Android: JDK 21, Android SDK Platform 36, NDK 28.2.13676358.
+- iOS: macOS with Xcode and CocoaPods. iOS builds cannot be produced on Linux/Windows.
+
+GitHub Actions (builds both platforms in parallel)
+1. Push this project to a GitHub repository, including `.github/workflows/build-mobile.yml`.
+2. Push to `main` or `master`, open a pull request, or run “Build Android and iOS”
+   from the repository's Actions tab with “Run workflow”.
+3. The workflow runs Android on Ubuntu and iOS on macOS simultaneously. Download
+   the `android-release-unsigned` and `ios-ipa-unsigned` artifacts from the run.
+4. The IPA produced by the default workflow is unsigned and cannot be installed
+   on a device or submitted to the App Store until signed. To produce a
+   distribution-signed IPA, add Apple signing/import steps to the workflow and
+   provide certificates through GitHub Secrets; no signing secrets are configured
+   or included in this source package.
+
+Android build
+1. Install Flutter 3.35.1, JDK 21, Android SDK Platform 36 and NDK 28.2.13676358.
+2. From the project root run:
+   flutter pub get
+   flutter build apk --release
+3. The APK is written under build/app/outputs/flutter-apk/.
+
+Release builds in this source package are intentionally unsigned. They can be
+built without a keystore, but an APK must be signed with a publisher-controlled
+key before store distribution. Do not commit private signing files or passwords.
+
+iOS build
+1. On a Mac, install Xcode, Flutter 3.35.1 and CocoaPods; run `flutter doctor`.
+2. From the project root run:
+   flutter pub get
+   cd ios && pod install && cd ..
+   flutter build ipa --release
+3. Distribution IPA builds need an Apple Developer signing certificate and
+   provisioning profile configured on that Mac. Keep those credentials outside
+   this project. For a simulator-only build, use `flutter build ios --simulator`.
+
+No keystore, provisioning profile, signing certificate, or local machine path is
+included in this source package. Android `android/local.properties` is generated
+locally by Flutter and should not be shared.
