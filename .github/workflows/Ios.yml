@@ -1,0 +1,250 @@
+
+name: AbtinMaps iOS App Store Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip_path:
+        description: "Path to source ZIP inside the repository"
+        required: true
+        default: "AbtinMaps-source.zip"
+        type: string
+      bundle_id:
+        description: "Exact iOS Bundle ID registered with Apple"
+        required: true
+        default: "com.example.abtinmaps"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    env:
+      BUNDLE_ID: ${{ inputs.bundle_id }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check source ZIP
+        run: |
+          test -f "${{ inputs.zip_path }}" || {
+            echo "Source ZIP not found: ${{ inputs.zip_path }}"
+            exit 1
+          }
+
+      - name: Extract source ZIP
+        id: project
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/source"
+          unzip -q "${{ inputs.zip_path }}" -d "$RUNNER_TEMP/source"
+
+          PUBSPEC=$(find "$RUNNER_TEMP/source" \
+            -maxdepth 5 -type f -name pubspec.yaml \
+            -not -path '*/.dart_tool/*' | head -n 1)
+
+          if [ -z "$PUBSPEC" ]; then
+            echo "pubspec.yaml not found in ZIP"
+            exit 1
+          fi
+
+          PROJECT_DIR="$(dirname "$PUBSPEC")"
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          echo "Flutter project: $PROJECT_DIR"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Check and generate iOS platform
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          flutter --version
+
+          if [ ! -d ios ]; then
+            flutter create --platforms=ios .
+          fi
+
+          flutter pub get
+
+      - name: Install Apple signing certificate
+        env:
+          P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          test -n "$P12_BASE64"
+          test -n "$P12_PASSWORD"
+          test -n "$KEYCHAIN_PASSWORD"
+
+          CERT_PATH="$RUNNER_TEMP/apple-cert.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+
+          printf '%s' "$P12_BASE64" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain \
+            -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings \
+            -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain \
+            -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security import "$CERT_PATH" \
+            -P "$P12_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          security list-keychains -d user \
+            -s "$KEYCHAIN_PATH"
+          security default-keychain -d user \
+            -s "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          rm -f "$CERT_PATH"
+
+      - name: Install provisioning profile
+        id: profile
+        env:
+          PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          test -n "$PROFILE_BASE64"
+
+          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
+
+          printf '%s' "$PROFILE_BASE64" \
+            | base64 --decode > "$PROFILE_PATH"
+
+          security cms -D -i "$PROFILE_PATH" \
+            > "$PROFILE_PLIST"
+
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy \
+            -c 'Print UUID' "$PROFILE_PLIST")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy \
+            -c 'Print Name' "$PROFILE_PLIST")
+          PROFILE_APP_ID=$(/usr/libexec/PlistBuddy \
+            -c 'Print :Entitlements:application-identifier' \
+            "$PROFILE_PLIST")
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          echo "name=$PROFILE_NAME" >> "$GITHUB_OUTPUT"
+          echo "app_id=$PROFILE_APP_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Validate signing configuration
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE_APP_ID: ${{ steps.profile.outputs.app_id }}
+        run: |
+          set -euo pipefail
+
+          test -n "$TEAM_ID"
+
+          EXPECTED="$TEAM_ID.$BUNDLE_ID"
+
+          if [ "$PROFILE_APP_ID" != "$EXPECTED" ]; then
+            echo "Provisioning profile does not match:"
+            echo "Expected: $EXPECTED"
+            echo "Actual:   $PROFILE_APP_ID"
+            exit 1
+          fi
+
+      - name: Configure iOS bundle identifier
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          set -euo pipefail
+
+          test -f ios/Runner.xcodeproj/project.pbxproj
+
+          /usr/bin/sed -i '' \
+            "s/PRODUCT_BUNDLE_IDENTIFIER = [^;]*/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID/g" \
+            ios/Runner.xcodeproj/project.pbxproj
+
+      - name: Create App Store export options
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE_NAME: ${{ steps.profile.outputs.name }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>destination</key>
+            <string>export</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>${TEAM_ID}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${PROFILE_NAME}</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Build signed release IPA
+        working-directory: ${{ steps.project.outputs.dir }}
+        env:
+          EXPORT_OPTIONS: ${{ runner.temp }}/ExportOptions.plist
+        run: |
+          set -euo pipefail
+
+          flutter build ipa \
+            --release \
+            --export-options-plist="$EXPORT_OPTIONS"
+
+          test -n "$(find build/ios/ipa \
+            -maxdepth 1 -name '*.ipa' -print -quit)"
+
+      - name: Zip release outputs
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-output
+
+          cp build/ios/ipa/*.ipa release-output/
+
+          cd release-output
+
+          for ipa in *.ipa; do
+            ditto -c -k --sequesterRsrc \
+              --keepParent "$ipa" "${ipa%.ipa}.zip"
+          done
+
+          if [ -d ../build/ios/archive/Runner.xcarchive ]; then
+            ditto -c -k --sequesterRsrc --keepParent \
+              ../build/ios/archive/Runner.xcarchive \
+              AbtinMaps.xcarchive.zip
+          fi
+
+          ls -lh
+
+      - name: Upload zipped release artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AbtinMaps-iOS-Release
+          path: |
+            ${{ steps.project.outputs.dir }}/release-output/*.zip
+          if-no-files-found: warn
+          retention-days: 14
