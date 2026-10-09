@@ -3,7 +3,7 @@ name: AbtinMaps - Build IPA
 
 on:
   workflow_dispatch:
-
+  
 
 jobs:
   build-ios:
@@ -19,38 +19,52 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Check project
+      - name: Check Flutter project
         run: |
           flutter --version
           test -f pubspec.yaml
+          test -f lib/main.dart
 
       - name: Generate iOS platform
         run: |
-          if [ ! -d ios ]; then
+          if [ ! -f ios/Podfile ]; then
             flutter create --platforms=ios --org com.abtinmaps .
           fi
+
+          test -f ios/Podfile
           test -f ios/Runner.xcodeproj/project.pbxproj
 
-      - name: Get dependencies
+      - name: Get Flutter dependencies
         run: flutter pub get
 
       - name: Install CocoaPods
         run: |
           cd ios
-          pod install
-          cd ..
+          pod install --repo-update
 
-      - name: Build iOS app
-        run: flutter build ios --release --no-codesign
+      - name: Build iOS release
+        run: |
+          flutter build ios --release --no-codesign
 
       - name: Package IPA
         run: |
           set -e
-          mkdir -p Payload dist
-          cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -qry dist/AbtinMaps.ipa Payload
 
-      - name: Upload IPA
+          APP_PATH="build/ios/iphoneos/Runner.app"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "ERROR: Runner.app was not generated"
+            exit 1
+          fi
+
+          mkdir -p Payload dist
+          cp -R "$APP_PATH" Payload/
+          /usr/bin/zip -qry dist/AbtinMaps.ipa Payload
+
+          test -s dist/AbtinMaps.ipa
+          ls -lh dist/AbtinMaps.ipa
+
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: AbtinMaps-IPA
