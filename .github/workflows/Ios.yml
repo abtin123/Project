@@ -3,12 +3,7 @@ name: AbtinMaps iOS App Store Release
 
 on:
   workflow_dispatch:
-    inputs:
-      zip_path:
-        description: "Path to source ZIP inside the repository"
-        required: true
-        default: "AbtinMaps-source.zip"
-        type: string
+   
       bundle_id:
         description: "Exact iOS Bundle ID registered with Apple"
         required: true
