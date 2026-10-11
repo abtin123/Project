@@ -375,9 +375,23 @@ jobs:
           echo "aab_zip=$PWD/release/$aab_zip" >> "$GITHUB_OUTPUT"
 
       - name: Upload Android release files
+        id: upload_android
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: android-release
+          if-no-files-found: error
+          path: |
+            ${{ steps.package_release.outputs.apk_zip }}
+            ${{ steps.package_release.outputs.aab_zip }}
+
+      # GitHub's artifact service sometimes times out; try once more.
+      - name: Upload Android release files (retry)
+        if: ${{ steps.upload_android.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          overwrite: true
           if-no-files-found: error
           path: |
             ${{ steps.package_release.outputs.apk_zip }}
@@ -640,9 +654,21 @@ jobs:
           done
 
       - name: Upload iOS release files
+        id: upload_ios
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ios-release
+          if-no-files-found: error
+          path: ${{ env.APP_DIR }}/release/*.ipa
+
+      # GitHub's artifact service sometimes times out; try once more.
+      - name: Upload iOS release files (retry)
+        if: ${{ steps.upload_ios.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release
+          overwrite: true
           if-no-files-found: error
           path: ${{ env.APP_DIR }}/release/*.ipa
 
