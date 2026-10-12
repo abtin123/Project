@@ -114,11 +114,23 @@ OpenStreetMap data is licensed under the **Open Database License (ODbL)**. Follo
 
 ### Permissions and privacy
 
-- **Location:** Used for current position and navigation.
-- **Camera:** Used by the camera-based AR view.
-- **Local storage/database:** The source includes local database components for app data.
+Abtin Maps is intended to respect user privacy. The developer's stated privacy policy is that the app does not store personal information, location history, travelled routes, camera images, GPS information, or other user data on a server or elsewhere outside the device. Information required for app features is intended to be processed locally on the device, and personal information is not intended to be sent to a server or third party for storage. Camera images are used only while the user is using the AR feature and are not intended to be stored on a server.
 
-The project owner’s stated policy is that the app does not store user data on a remote server. This statement should be verified against the actual build and any services configured before release. Location access is sensitive: request it only when needed, explain its purpose clearly, and do not claim that no data is collected unless all enabled services and dependencies have been audited.
+These statements describe the developer's declared policy; they are not an independent security audit. Actual data handling depends on the exact release build, enabled services, and third-party dependencies. Verify the release build and its network behavior before publication.
+
+- **Camera:** Requested only for the camera-based augmented-reality (AR) feature.
+- **Location (GPS):** Used to determine the user's current position, show it on the map, and provide navigation.
+- **Free to use:** Abtin Maps is offered free of charge.
+
+### OpenStreetMap data
+
+Map data used by Abtin Maps is sourced from the OpenStreetMap project, a collaborative open mapping project. Abtin Maps is an independent application and is not affiliated with, sponsored by, or commercially connected to the OpenStreetMap Foundation. OpenStreetMap data is available under the Open Database License (ODbL); attribution and applicable license requirements must be respected. See https://www.openstreetmap.org/copyright.
+
+### GLB 3D models and third-party assets
+
+The app uses certain GLB-format 3D models for vehicle visuals and other graphical elements. The developer states that these files were obtained from sources offering models for free and were used in the project while retaining their original filenames. The models are not represented or sold as original works created by the developer, and the app does not sell or independently commercially distribute the 3D model files. Abtin Maps itself is free to use.
+
+Free availability does not necessarily mean that every model permits every type of reuse. Each model's original license and attribution requirements should be checked. If a creator, rights holder, or original publisher has a concern about a model used in the app, please email **abtinmaps@gmail.com**. After receiving and reviewing a request, if ownership or a use restriction is substantiated, the relevant model will be removed or replaced with an asset whose use is permitted.
 
 ### Testing status
 
@@ -304,6 +316,102 @@ flutter build appbundle --release
 ### مجوز انتشار کد
 
 در این README مجوز عمومی مشخصی برای کل کد پروژه اعلام نشده است. تا زمانی که فایل `LICENSE` اضافه نشده، استفادهٔ آزاد و نامحدود از کد را مفروض ندانید. داده‌های OpenStreetMap، کتابخانه‌ها، فونت‌ها، آیکون‌ها و مدل‌های سه‌بعدی ممکن است هرکدام شرایط مجوز و انتساب جداگانه داشته باشند. پیش از انتشار عمومی مخزن، فایل `LICENSE` و فهرست منابع و مجوز فایل‌های جانبی را اضافه کنید.
+
+---
+
+## App description | معرفی برنامه برای کاربران
+
+### فارسی
+
+# آبتین Maps | نقشه و مسیریابی آفلاین و آنلاین
+
+آبتین Maps یک اپلیکیشن رایگان نقشه و مسیریابی است که با هدف ارائهٔ تجربه‌ای ساده، سریع و کاربردی برای مشاهدهٔ نقشه، پیدا کردن مکان‌ها و مسیریابی طراحی شده است. این برنامه از داده‌های OpenStreetMap استفاده می‌کند و برای کار با نقشه‌های آنلاین و نقشه‌های ذخیره‌شده روی دستگاه طراحی شده است. دسترس‌پذیری و کیفیت هر قابلیت به نسخهٔ برنامه، داده‌های نقشهٔ موجود و آزمایش روی دستگاه بستگی دارد.
+
+**امکانات اصلی**
+
+- نمایش نقشه بر پایهٔ داده‌های OpenStreetMap
+- قابلیت‌های نمایش مسیر و مسیریابی، با وابستگی عملکرد به داده‌ها و نسخهٔ برنامه
+- پشتیبانی کدنویسی‌شده از نقشه و مسیریابی آفلاین؛ پیش از اتکا به آن، عملکرد بستهٔ منطقه‌ای را بررسی کنید
+- نمایش موقعیت فعلی کاربر با GPS
+- قطب‌نما و نمایش جهت شمال، در صورت پشتیبانی دستگاه و نسخه
+- نمایش سرعت لحظه‌ای خودرو، در صورت دسترسی به دادهٔ موقعیت
+- ذخیرهٔ خانه، محل کار و مکان‌های موردعلاقه در قابلیت‌های پشتیبانی‌شدهٔ برنامه
+- جست‌وجوی مکان‌ها و معابر، وابسته به منبع داده و وضعیت اتصال
+- مدیریت نقشه‌های مناطق مختلف
+- حالت شب برای راحتی بیشتر هنگام استفاده در محیط کم‌نور
+- نمایش خودرو با مدل سه‌بعدی GLB
+- رابط کاربری با سبک شیشه‌ای (Glass)
+- منابع رابط کاربری چندزبانه
+- نمای دوربین واقعیت افزوده (AR) در بخش مربوطه
+
+**مجوزهای برنامه**
+
+- **دوربین:** فقط برای استفاده از قابلیت واقعیت افزوده (AR) درخواست می‌شود.
+- **موقعیت مکانی (GPS):** برای تشخیص موقعیت فعلی، نمایش آن روی نقشه و ارائهٔ قابلیت‌های مسیریابی استفاده می‌شود.
+
+**حریم خصوصی**
+
+طبق سیاست اعلام‌شدهٔ سازنده، آبتین Maps اطلاعات شخصی، موقعیت مکانی، مسیرهای طی‌شده، تصاویر دوربین یا اطلاعات GPS کاربران را روی سرور ذخیره نمی‌کند و اطلاعات شخصی را برای ذخیره‌سازی به سرور یا شخص ثالث ارسال نمی‌کند. پردازش موردنیاز قابلیت‌ها برای استفادهٔ برنامه روی دستگاه انجام می‌شود و تصاویر دوربین صرفاً هنگام استفاده از قابلیت AR به کار می‌روند. این توضیحات بیانگر سیاست اعلام‌شدهٔ سازنده هستند؛ رفتار نسخهٔ نهایی و وابستگی‌های آن باید پیش از انتشار نیز بررسی شود.
+
+**منبع نقشه**
+
+داده‌های نقشه از پروژهٔ مشارکتی OpenStreetMap تهیه می‌شوند. آبتین Maps برنامه‌ای مستقل است و وابستگی یا وابستگی تجاری مستقیمی به OpenStreetMap Foundation ندارد. اطلاعات مجوز و انتساب: https://www.openstreetmap.org/copyright
+
+**مدل‌های سه‌بعدی GLB**
+
+برخی مدل‌های سه‌بعدی از منابعی دریافت شده‌اند که آن‌ها را رایگان ارائه می‌کنند و نام فایل‌های اصلی حفظ شده است. این مدل‌ها به‌عنوان آثار تولیدشده توسط سازندهٔ آبتین Maps معرفی یا فروخته نمی‌شوند و برنامه برای استفاده از خود اپلیکیشن هزینه‌ای دریافت نمی‌کند. رایگان بودن دانلود یک مدل لزوماً به معنی مجاز بودن همهٔ انواع استفاده نیست؛ شرایط مجوز هر مدل باید جداگانه بررسی شود.
+
+اگر سازنده، صاحب حقوق یا منتشرکنندهٔ اصلی مدلی دربارهٔ استفاده از آن در برنامه مشکلی دارد، از طریق ایمیل زیر اطلاع دهد. پس از دریافت و بررسی درخواست و در صورت تأیید مالکیت یا محدودیت استفاده، مدل موردنظر حذف یا با مدلی دارای مجوز مناسب جایگزین می‌شود.
+
+**ارتباط با سازنده:** abtinmaps@gmail.com
+
+---
+
+### English
+
+# Abtin Maps | Online and Offline Maps & Navigation
+
+Abtin Maps is a free map and navigation application designed to provide a simple, fast, and practical way to view maps, find places, and navigate. It uses OpenStreetMap data and is designed to work with online maps as well as map data stored on the device. Feature availability and quality depend on the app version, available map data, and testing on the target device.
+
+**Main features**
+
+- Map display based on OpenStreetMap data
+- Route display and navigation features, subject to the available data and app version
+- Code support for offline maps and offline routing; verify the regional map package before relying on it
+- Current-location display using GPS
+- Compass and north-direction indicator where supported by the device and app version
+- Vehicle speed display when location data is available
+- Saving Home, Work, and favorite places in supported app features
+- Place and street search, depending on the data source and connection state
+- Management of maps for different regions
+- Night mode for more comfortable use in low-light conditions
+- 3D vehicle visuals using GLB models
+- Glass-style user interface
+- Multilingual interface resources
+- Camera-based augmented reality (AR) view
+
+**App permissions**
+
+- **Camera:** Requested only for the augmented-reality (AR) feature.
+- **Location (GPS):** Used to determine and display the user's current position and support navigation.
+
+**Privacy**
+
+According to the developer's stated policy, Abtin Maps does not store users' personal information, location, travelled routes, camera images, or GPS information on a server, and does not send personal information to a server or third party for storage. Processing required for app features is intended to take place on the device. Camera images are used only while the AR feature is in use. These statements describe the developer's declared policy; the final release build and its dependencies should also be checked before publication.
+
+**Map data source**
+
+Map data is sourced from OpenStreetMap, a collaborative mapping project. Abtin Maps is an independent application and is not affiliated with or commercially connected to the OpenStreetMap Foundation. OpenStreetMap data is licensed under the Open Database License (ODbL), and applicable attribution and license requirements must be followed: https://www.openstreetmap.org/copyright.
+
+**GLB 3D models**
+
+Some 3D models were obtained from sources that offer models for free, and their original filenames have been retained. These models are not presented or sold as works created by the Abtin Maps developer, and the app does not charge users to use the application. Free downloads do not automatically permit every kind of reuse, so the license terms for each model should be checked separately.
+
+If a creator, rights holder, or original publisher has a concern about a model used in the app, please contact us by email. After reviewing the request, if ownership or a usage restriction is substantiated, the model will be removed or replaced with an asset whose use is permitted.
+
+**Contact the developer:** abtinmaps@gmail.com
+
+---
 
 ---
 
