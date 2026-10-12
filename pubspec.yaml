@@ -1,0 +1,112 @@
+name: abtin_maps
+description: "آبتین مپس — مسیریاب هوشمند آفلاین سه‌بعدی"
+publish_to: 'none'
+version: 0.0.14+14
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- State management / DI ---
+  flutter_riverpod: ^2.5.1
+
+  # --- Navigation/Routing (app-internal screen routing, not GPS routing) ---
+  go_router: ^17.2.3
+
+  # --- Local database (Saved Places, POI index, route cache) ---
+  drift: ^2.18.0
+  sqlite3_flutter_libs: ^0.5.24
+  sqlite3: ^2.4.6
+  path_provider: ^2.1.3
+  path: ^1.9.0
+  # --- GPS / Location (used from Phase 5 onward, wired now for permission flow) ---
+  geolocator: ^12.0.0
+  permission_handler: ^11.3.1
+
+  # --- دوربین زنده برای نمای واقعی (AR) ---
+  camera: ^0.11.0+2
+
+  # --- شتاب‌سنج گوشی (برای اتصال واقعی سرعت‌سنج به سنسور فیزیکی و فیوژن با GPS) ---
+  sensors_plus: ^6.1.1
+
+  # --- رندر واقعیِ سه‌بعدیِ GLB خودرو با موتور Filament گوگل (بدون WebView) ---
+  model_viewer_plus: ^1.9.3
+  webview_flutter: any
+
+  # --- HTTP Client (برای درخواست‌های API مسیریابی) ---
+  http: ^1.2.0
+  package_info_plus: ^8.3.0
+
+  # --- رندر پرچم‌های واقعیِ SVG با کیفیت مستقل از اندازه ---
+  flutter_svg: ^2.2.1
+
+  # موتور واحدِ برداری GPUمحور برای نقشهٔ آفلاین/آنلاین. ABM توسط
+  # AbmRenderer به GeoJSON تبدیل و روی Style Layerهای native نمایش داده می‌شود.
+  maplibre_gl: ^0.27.1
+
+
+  # --- لینک عمیق (Deep Link) برای باز شدن اپ با آدرس abtin://navigate ---
+  app_links: ^6.4.1
+
+  crypto: ^3.0.3
+  # --- پخش صوت‌های ضبط‌شده (MP3) ---
+  just_audio: ^0.9.40
+  audio_session: ^0.1.25
+
+  # --- اشتراک‌گذاریِ مکان‌های ذخیره‌شده (دکمه‌ی «اشتراک‌گذاری» در علاقه‌مندی‌ها) ---
+  # نکته‌ی مهم (رفع خطای بیلد CI): نسخه‌ی ۱۳ به بعدِ share_plus به Dart SDK
+  # ≥3.10 نیاز دارد، در حالی که این پروژه (و Flutter 3.35.1 که در CI نصب
+  # می‌شود) روی Dart 3.9.0 است، پس `flutter pub get` با خطای version solving
+  # شکست می‌خورد. نسخه‌ی ۱۲ همان API جدید (`SharePlus.instance.share` +
+  # `ShareParams`) را دارد، پس بدون نیاز به تغییر کد فقط ورژن پایین آمد.
+  share_plus: ^12.0.2
+  url_launcher: ^6.3.1
+  # maplibre_gl به image/archive نسل ۴ نیاز دارد؛ API مصرف‌شدهٔ پروژه
+  # (ZipDecoder/ArchiveFile) در این نسخه حفظ شده است.
+  archive: ^4.2.0
+
+  intl: ^0.20.2
+  flutter_localizations:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  drift_dev: ^2.18.0
+  build_runner: ^2.4.9
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: Vazirmatn
+      fonts:
+        - asset: assets/fonts/Vazirmatn-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Vazirmatn-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Vazirmatn-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Vazirmatn-ExtraBold.ttf
+          weight: 800
+
+  assets:
+    - assets/local/fa.json
+    - assets/local/en.json
+    - assets/images/
+    - assets/maps/countries/
+    - assets/images/flags/
+    - assets/models/
+    - assets/styles/
+    - assets/world/
+    - assets/glyphs/Vazirmatn/
+    - assets/glyphs/VazirmatnBold/
+    - assets/sprites/
+    - assets/icons/
+    - assets/audio/
