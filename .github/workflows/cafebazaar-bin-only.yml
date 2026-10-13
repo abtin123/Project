@@ -1,0 +1,128 @@
+name: Cafe Bazaar BIN Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag of the existing GitHub Release that contains the signed AAB (or an AAB ZIP)'
+        required: true
+        type: string
+      aab_asset_pattern:
+        description: 'Release asset pattern to download, for example *.aab or *.aab.zip'
+        required: true
+        default: '*.aab*'
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  make-bin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (for key.properties and keystore)
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download existing AAB from the selected release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+          ASSET_PATTERN: ${{ inputs.aab_asset_pattern }}
+        run: |
+          set -euo pipefail
+          mkdir -p incoming
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir incoming --pattern "$ASSET_PATTERN"
+          find incoming -maxdepth 1 -type f -printf '%f\n'
+          if ! find incoming -type f \( -name '*.aab' -o -name '*.aab.zip' -o -name '*.zip' \) | grep -q .; then
+            echo 'No AAB or AAB ZIP was downloaded from this release. This workflow does not build the app.' >&2
+            exit 1
+          fi
+          find incoming -type f -name '*.zip' -print0 | while IFS= read -r -d '' z; do
+            unzip -o "$z" -d incoming/unpacked
+          done
+          AAB_PATH="$(find incoming -type f -name '*.aab' -print -quit)"
+          if [ -z "$AAB_PATH" ]; then
+            echo 'Downloaded assets did not contain an .aab file. Add the AAB (or a ZIP containing it) to the release.' >&2
+            exit 1
+          fi
+          echo "AAB_PATH=$AAB_PATH" >> "$GITHUB_ENV"
+
+      - name: Read signing configuration
+        id: signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROPS="android/key.properties"
+          if [ ! -f "$PROPS" ]; then
+            echo "Missing $PROPS. Expected the existing project signing configuration." >&2
+            exit 1
+          fi
+          get_prop() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$PROPS" | head -n1 | tr -d '\r'; }
+          STORE_FILE="$(get_prop storeFile)"
+          KEY_ALIAS="$(get_prop keyAlias)"
+          STORE_PASSWORD="$(get_prop storePassword)"
+          KEY_PASSWORD="$(get_prop keyPassword)"
+          if [ -z "$STORE_FILE" ] || [ -z "$KEY_ALIAS" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo 'android/key.properties must define storeFile, keyAlias, storePassword, and keyPassword.' >&2
+            exit 1
+          fi
+          case "$STORE_FILE" in
+            /*) KS="$STORE_FILE" ;;
+            *) KS="android/$STORE_FILE"; [ -f "$KS" ] || KS="$STORE_FILE" ;;
+          esac
+          if [ ! -f "$KS" ]; then
+            echo "Keystore not found at the path configured in key.properties: $STORE_FILE" >&2
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$STORE_PASSWORD" > "$RUNNER_TEMP/ks-pass.txt"
+          printf '%s' "$KEY_PASSWORD" > "$RUNNER_TEMP/key-pass.txt"
+          echo "KS_PATH=$KS" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+
+      - name: Generate Cafe Bazaar BIN
+        env:
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          VERSION=0.1.14
+          curl -fL --retry 3 "https://github.com/cafebazaar/bundle-signer/releases/download/v${VERSION}/bundlesigner-${VERSION}.jar" -o "$RUNNER_TEMP/bundlesigner.jar"
+          mkdir -p output
+          java -jar "$RUNNER_TEMP/bundlesigner.jar" genbin -v \
+            --bundle "$AAB_PATH" \
+            --bin output \
+            --v2-signing-enabled true \
+            --v3-signing-enabled false \
+            --ks "$KS_PATH" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass "file:$RUNNER_TEMP/ks-pass.txt" \
+            --key-pass "file:$RUNNER_TEMP/key-pass.txt"
+          BIN_PATH="$(find output -type f -name '*.bin' -print -quit)"
+          if [ -z "$BIN_PATH" ]; then
+            echo 'bundle-signer finished but no .bin file was produced.' >&2
+            exit 1
+          fi
+          cp "$BIN_PATH" "${GITHUB_WORKSPACE}/CafeBazaar-${TAG}.bin"
+          test -s "${GITHUB_WORKSPACE}/CafeBazaar-${TAG}.bin"
+
+      - name: Attach only the BIN to the existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" "CafeBazaar-${TAG}.bin" --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Upload BIN-only workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cafe-bazaar-bin-${{ inputs.release_tag }}
+          path: CafeBazaar-${{ inputs.release_tag }}.bin
+          if-no-files-found: error
+          retention-days: 14
