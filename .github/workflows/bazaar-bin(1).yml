@@ -1,0 +1,161 @@
+name: Bazaar signed bin (from existing release AAB)
+
+# aab.zip از قبل در Release ساخته و آپلود شده؛ این workflow فقط آن را می‌گیرد،
+# unzip می‌کند و با bundle-signer کافه‌بازار فایل bin امضاشده را می‌سازد.
+# keystore داخل یک zip (کل اپ) در خود ریپو است؛ فقط فایل‌های keystore از آن بیرون کشیده می‌شوند.
+# اجرا: Actions → Run workflow → تگ ریلیز را دقیقاً وارد کن (مثلاً V0.0.15، حساس به بزرگی/کوچکی حروف)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag containing the aab zip'
+        required: true
+        default: 'V0.0.15'
+      keystore_zip:
+        description: 'Path of the app zip inside the repo (leave empty to scan all zips)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+env:
+  BUNDLESIGNER_VERSION: 'v0.1.13'
+  ABTIN_KEYSTORE_PASSWORD: ${{ secrets.ABTIN_KEYSTORE_PASSWORD }}
+  ABTIN_KEYSTORE_ALIAS: ${{ secrets.ABTIN_KEYSTORE_ALIAS }}
+  ABTIN_KEYSTORE_KEY_PASSWORD: ${{ secrets.ABTIN_KEYSTORE_KEY_PASSWORD }}
+
+jobs:
+  bazaar-bin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repo (to get the app zip with keystore)
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download AAB zip from this repo's release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p dl dist/bin
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*aab*.zip' --dir dl
+          ls -la dl
+          unzip -o dl/*.zip -d dl/unz
+          AAB=$(find dl/unz -name '*.aab' | head -n 1)
+          test -n "$AAB" || { echo "::error::no .aab found inside the zip"; exit 1; }
+          cp "$AAB" dist/app-release.aab
+
+      - name: Find keystore inside repo zip
+        env:
+          KS_ZIP_INPUT: ${{ inputs.keystore_zip }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/ks"
+          rm -rf "$OUT"
+          mkdir -p "$OUT"
+
+          # لیست zipهای کاندید (داخل ریپو؛ پوشه‌های کاری همین workflow نادیده گرفته می‌شوند)
+          if [ -n "$KS_ZIP_INPUT" ]; then
+            ZIPS="$KS_ZIP_INPUT"
+          else
+            ZIPS=$(find . \( -path ./.git -o -path ./dl -o -path ./dist -o -path ./tools \) -prune -o -type f -iname '*.zip' -print)
+          fi
+          test -n "$ZIPS" || { echo "::error::no zip file found in repo"; exit 1; }
+          echo "Candidate zips:"; echo "$ZIPS"
+
+          FOUND=0
+          IDX=0
+          while IFS= read -r Z; do
+            [ -n "$Z" ] || continue
+            IDX=$((IDX+1))
+            D="$OUT/$IDX"
+            mkdir -p "$D"
+            echo "---- Scanning: $Z"
+            # فقط فایل‌های keystore را بیرون بکش، نه کل اپ را
+            unzip -o -q -C "$Z" '*.jks' '*.p12' '*.pfx' '*.keystore' -d "$D" >/dev/null 2>&1 || true
+
+            while IFS= read -r KS; do
+              [ -n "$KS" ] || continue
+              echo "Keystore candidate: ${KS#$D/}"
+              for TYPE in PKCS12 JKS; do
+                if keytool -list -keystore "$KS" -storetype "$TYPE" \
+                     -storepass:env ABTIN_KEYSTORE_PASSWORD >/dev/null 2>&1; then
+                  echo "  opened as $TYPE; private key aliases:"
+                  keytool -list -keystore "$KS" -storetype "$TYPE" \
+                    -storepass:env ABTIN_KEYSTORE_PASSWORD 2>/dev/null \
+                    | grep -i 'PrivateKeyEntry' | sed 's/^/    /' || true
+                  if keytool -list -keystore "$KS" -storetype "$TYPE" \
+                       -storepass:env ABTIN_KEYSTORE_PASSWORD \
+                       -alias "$ABTIN_KEYSTORE_ALIAS" >/dev/null 2>&1; then
+                    echo "  alias matches -> using this keystore"
+                    chmod 600 "$KS"
+                    echo "ABTIN_KEYSTORE_PATH=$KS" >> "$GITHUB_ENV"
+                    echo "ABTIN_KEYSTORE_TYPE=$TYPE" >> "$GITHUB_ENV"
+                    FOUND=1
+                    break 3
+                  fi
+                  break
+                fi
+              done
+            done < <(find "$D" -type f)
+          done <<< "$ZIPS"
+
+          if [ "$FOUND" -ne 1 ]; then
+            echo "::error::no keystore matched the password + alias. Check ABTIN_KEYSTORE_PASSWORD / ABTIN_KEYSTORE_ALIAS or set keystore_zip."
+            exit 1
+          fi
+
+      - name: Download Bazaar bundle-signer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p tools
+          gh release download "$BUNDLESIGNER_VERSION" \
+            --repo cafebazaar/bundle-signer \
+            --pattern 'bundlesigner-*.jar' --dir tools
+          ls -la tools
+
+      - name: Generate Bazaar signed bin
+        run: |
+          set -euo pipefail
+          JAR=$(ls tools/bundlesigner-*.jar | head -n 1)
+          java -jar "$JAR" genbin -v \
+            --bundle dist/app-release.aab \
+            --bin dist/bin \
+            --v2-signing-enabled true \
+            --v3-signing-enabled false \
+            --ks "$ABTIN_KEYSTORE_PATH" \
+            --ks-type "$ABTIN_KEYSTORE_TYPE" \
+            --ks-key-alias "$ABTIN_KEYSTORE_ALIAS" \
+            --ks-pass env:ABTIN_KEYSTORE_PASSWORD \
+            --key-pass env:ABTIN_KEYSTORE_KEY_PASSWORD
+          ls -la dist dist/bin
+
+      - name: Upload bin as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bazaar-bin-${{ inputs.tag }}
+          path: dist/bin/
+          if-no-files-found: error
+
+      - name: Attach bin to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" dist/bin/* --clobber --repo "$GITHUB_REPOSITORY"
+
+      - name: Remove keystore
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/ks"
