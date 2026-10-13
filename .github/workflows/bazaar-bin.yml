@@ -10,7 +10,7 @@ on:
       tag:
         description: 'Release tag containing the aab zip'
         required: true
-        default: 'v0.0.15'
+        default: 'V0.0.15'
 
 permissions:
   contents: write
