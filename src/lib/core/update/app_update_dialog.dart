@@ -1,0 +1,76 @@
+import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../localization/app_localizations.dart';
+import 'app_update_service.dart';
+
+String _sizeLabel(int bytes) =>
+    bytes <= 0 ? '' : ' (${(bytes / (1024 * 1024)).toStringAsFixed(0)} MB)';
+
+const String kAppPackageId = 'ir.abtin.abtin_maps';
+
+/// تا وقتی مایکت اپ را منتشر نکرده false بماند؛ به‌روزرسانی از لینک دانلود
+/// گیت‌هاب انجام می‌شود. بعد از انتشار در مایکت true کنید.
+const bool kPublishedOnMyket = false;
+
+Future<void> openAppUpdate(AppUpdateInfo info) async {
+  final targets = <Uri>[
+    if (kPublishedOnMyket) ...[
+      Uri.parse('myket://details?id=$kAppPackageId'),
+      Uri.parse('https://myket.ir/app/$kAppPackageId'),
+    ],
+    Uri.parse(info.downloadUrl),
+    Uri.parse(info.releasePageUrl),
+  ];
+  for (final uri in targets) {
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } catch (_) {}
+  }
+}
+
+Future<bool> showAppUpdateDialog(BuildContext context, AppUpdateInfo info) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: Text(AppStrings.literal('نسخهٔ جدید آبتین‌مپ')),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'نسخهٔ ${info.latestVersion} منتشر شده است '
+                '(نسخهٔ شما: ${info.currentVersion})'
+                '${_sizeLabel(info.apkSizeBytes)}',
+              ),
+              if (info.notes.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  info.notes.length > 600
+                      ? '${info.notes.substring(0, 600)}…'
+                      : info.notes,
+                  style: Theme.of(ctx).textTheme.bodySmall,
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(AppStrings.literal('بعداً')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(AppStrings.literal('به‌روزرسانی')),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (result == true) await openAppUpdate(info);
+  return result == true;
+}
