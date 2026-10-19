@@ -92,7 +92,7 @@
 
 آبتین Maps کاملاً رایگان است و هدف آن ارائه یک ابزار کاربردی و قابل دسترس برای نقشه و مسیریابی است.
 
-توضیحات انگلیسی
+## English
 Abtin Maps | Offline and Online Maps & Navigation
 
 Abtin Maps is a free mapping and navigation application designed to provide a simple, fast, and practical experience for viewing maps, finding places, and navigating to destinations.
