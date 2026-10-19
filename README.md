@@ -2,7 +2,7 @@
 
 ## فارسی
 
-[فارسی](#فارسی) · [English](#english)
+   [English](#english)
 
 آبتین Maps | نقشه و مسیریابی آفلاین و آنلاین
 
@@ -91,7 +91,7 @@
 ایمیل: abtinmaps@gmail.com
 
 آبتین Maps کاملاً رایگان است و هدف آن ارائه یک ابزار کاربردی و قابل دسترس برای نقشه و مسیریابی است.
-
+[فارسی](#فارسی) 
 ## English
 Abtin Maps | Offline and Online Maps & Navigation
 
