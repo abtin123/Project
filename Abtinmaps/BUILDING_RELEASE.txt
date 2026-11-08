@@ -1,0 +1,25 @@
+AbtinMaps — Release build
+========================
+
+Requirements
+- Flutter 3.35.1 stable (Dart 3.9.0)
+- Android SDK Platform 36
+- Android NDK 28.2.13676358
+- Java/JDK 21
+
+Build
+1. Open a terminal in the project root (the folder containing pubspec.yaml).
+2. Run: flutter pub get
+3. Run: flutter build apk --release
+
+The Android release signing configuration is in android/key.properties and the
+PKCS#12 signing key is android/Key-abtin.p12. The generated APK is normally at
+build/app/outputs/flutter-apk/app-release.apk.
+
+SECURITY WARNING
+This source package intentionally includes the private signing keystore and
+its local signing configuration, including the password in plaintext. Treat
+the entire source ZIP as a secret: store it securely and share it only with
+people authorized to sign AbtinMaps releases. Anyone with these files can sign
+an APK as this publisher. If the archive is exposed, replace/rotate the key
+where possible before publishing future app updates.
