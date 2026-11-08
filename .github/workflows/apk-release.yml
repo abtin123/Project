@@ -225,6 +225,10 @@ jobs:
     if: ${{ !cancelled() && needs.apk.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
+      # checkout FIRST: it cleans the workspace, so it must run before apks/ and dist/ are created
+      - uses: actions/checkout@v4
+        if: ${{ inputs.publish_release }}
+
       - uses: actions/download-artifact@v4
         with:
           pattern: tmp-apk-*
@@ -265,9 +269,6 @@ jobs:
       #   - key files committed directly (android/keystore/, key.properties, *.jks, *.keystore)
       #   - the same files inside any project ZIP committed in the repository
       # The branch and the original ZIPs stay untouched; the APKs above were already built with the key.
-      - uses: actions/checkout@v4
-        if: ${{ inputs.publish_release }}
-
       - name: Tag a keystore-free copy of the source
         if: ${{ inputs.publish_release }}
         shell: bash
