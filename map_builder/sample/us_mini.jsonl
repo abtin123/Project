@@ -1,5 +1,0 @@
-{"kind":"node","id":1,"lat":40.71,"lon":-74.00,"tags":{"place":"city","name":"New York","name:en":"New York"}}
-{"kind":"node","id":2,"lat":40.72,"lon":-74.01,"tags":{"amenity":"hospital","name":"NYC Hospital","name:en":"NYC Hospital"}}
-{"kind":"way","id":100,"node_ids":[10,11],"geometry":[[-74.02,40.70],[-73.98,40.73]],"tags":{"highway":"primary","name":"Broadway","name:en":"Broadway","oneway":"no","maxspeed":"55"}}
-{"kind":"node","id":3,"lat":34.05,"lon":-118.24,"tags":{"place":"city","name":"Los Angeles","name:en":"Los Angeles"}}
-{"kind":"way","id":101,"node_ids":[12,13],"geometry":[[-118.30,34.00],[-118.20,34.10]],"tags":{"highway":"motorway","name":"Interstate 10","name:en":"Interstate 10","oneway":"yes","maxspeed":"105"}}
