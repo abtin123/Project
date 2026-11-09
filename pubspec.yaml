@@ -1,7 +1,7 @@
 name: abtin_maps
 description: "آبتین مپس — مسیریاب هوشمند آفلاین سه‌بعدی"
 publish_to: 'none'
-version: 0.0.19
+version: 0.0.20+20
 
 environment:
   sdk: '>=3.6.0 <4.0.0'
