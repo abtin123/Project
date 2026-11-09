@@ -1,0 +1,468 @@
+name: Apk to release from secret key
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip_paths:
+        description: 'ZIP paths in repository: separate with comma or new line, globs allowed (e.g. zips/*.zip). Empty = build repository directly'
+        required: false
+        default: ''
+      flutter_version:
+        description: 'Flutter version (empty = latest stable)'
+        required: false
+        default: ''
+      xray_tag:
+        description: 'patterniha/AndroidLibXrayLite tag for armv7 / x86_64 libgojni.so (empty = latest)'
+        required: false
+        default: ''
+      max_parallel:
+        description: 'Max jobs running at the same time in this run (GitHub free plan allows 20 at once, the rest wait in queue automatically)'
+        required: false
+        default: '20'
+      publish_release:
+        description: 'Also attach APK ZIPs to GitHub Release (one release per run)'
+        type: boolean
+        default: true
+
+# No cancel-in-progress and no shared group: every dispatch runs independently, nothing waits for another build.
+permissions:
+  contents: write
+  actions: write
+
+env:
+  # GitHub matrix limit is 256 jobs per run. 83 zips x 3 ABIs = 249. Extra zips are
+  # dispatched automatically as a new run, so any number of zips works.
+  ZIPS_PER_RUN: 83
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      tag: ${{ steps.plan.outputs.tag }}
+      release: ${{ steps.plan.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build matrix (zip x ABI) and dispatch overflow
+        id: plan
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZIP_INPUT: ${{ inputs.zip_paths }}
+          FLUTTER_VERSION: ${{ inputs.flutter_version }}
+          XRAY_TAG: ${{ inputs.xray_tag }}
+          MAX_PARALLEL: ${{ inputs.max_parallel }}
+          PUBLISH: ${{ inputs.publish_release }}
+        run: |
+          set -euo pipefail
+
+          # 1) parse the zip list (comma / new line separated, globs expanded)
+          mapfile -t items < <(printf '%s\n' "$ZIP_INPUT" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed '/^$/d')
+          zips=()
+          declare -A seen=()
+          if [ ${#items[@]} -eq 0 ]; then
+            zips=("")
+          else
+            for p in "${items[@]}"; do
+              if [[ "$p" == *[\*\?\[]* ]]; then
+                g=()
+                mapfile -t g < <(compgen -G "$p" | sort || true)
+                [ ${#g[@]} -gt 0 ] || echo "::warning::no file matches: $p"
+                for f in "${g[@]}"; do
+                  [ -n "${seen[$f]:-}" ] || { seen[$f]=1; zips+=("$f"); }
+                done
+              else
+                [ -f "$p" ] || { echo "::error::ZIP not found: $p"; exit 1; }
+                [ -n "${seen[$p]:-}" ] || { seen[$p]=1; zips+=("$p"); }
+              fi
+            done
+          fi
+          [ ${#zips[@]} -gt 0 ] || { echo "::error::no ZIP selected"; exit 1; }
+          echo "total ZIPs requested: ${#zips[@]}"
+
+          # 2) this run takes the first ZIPS_PER_RUN zips, the rest go to a new run
+          cur=("${zips[@]:0:$ZIPS_PER_RUN}")
+          rest=("${zips[@]:$ZIPS_PER_RUN}")
+
+          if [ ${#rest[@]} -gt 0 ]; then
+            WF="$(basename "${GITHUB_WORKFLOW_REF%%@*}")"
+            REST="$(IFS=,; echo "${rest[*]}")"
+            echo "dispatching ${#rest[@]} remaining ZIPs as a new run of $WF"
+            gh workflow run "$WF" --ref "$GITHUB_REF_NAME" \
+              -f zip_paths="$REST" \
+              -f flutter_version="$FLUTTER_VERSION" \
+              -f xray_tag="$XRAY_TAG" \
+              -f max_parallel="$MAX_PARALLEL" \
+              -f publish_release="$PUBLISH"
+          fi
+
+          # 3) matrix
+          declare -A names=()
+          : > /tmp/matrix.jsonl
+          idx=0
+          for z in "${cur[@]}"; do
+            idx=$((idx+1))
+            if [ -z "$z" ]; then base="repository"; else base="$(basename "$z" .zip)"; fi
+            base="$(printf '%s' "$base" | tr -c 'A-Za-z0-9._-' '_')"
+            if [ -n "${names[$base]:-}" ]; then base="${base}-${idx}"; fi
+            names[$base]=1
+            for pair in "arm64-v8a:android-arm64" "armeabi-v7a:android-arm" "x86_64:android-x64"; do
+              abi="${pair%%:*}"; platform="${pair##*:}"
+              jq -cn --arg id "${idx}-${abi}" --arg zip "$z" --arg name "$base" --arg abi "$abi" --arg platform "$platform" \
+                '{id:$id, zip:$zip, name:$name, abi:$abi, platform:$platform}' >> /tmp/matrix.jsonl
+            done
+          done
+          echo "matrix=$(jq -cs '{include: .}' /tmp/matrix.jsonl)" >> "$GITHUB_OUTPUT"
+          echo "tag=build-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "release=$PUBLISH" >> "$GITHUB_OUTPUT"
+          echo "jobs in this run: $(wc -l < /tmp/matrix.jsonl)"
+
+      # GitHub builds the release's "Source code (zip / tar.gz)" from the commit the tag points to.
+      # The tag is put on a separate commit (on no branch) in which every signing key is removed:
+      #   - key files committed directly (android/keystore/, key.properties, *.jks, *.keystore)
+      #   - the same files inside any project ZIP committed in the repository
+      # The branch and the original ZIPs stay untouched. The release is created now (before the builds)
+      # so every APK job can upload its own file as soon as it finishes, without waiting for the others.
+      - name: Tag a keystore-free copy of the source and create the release
+        if: ${{ inputs.publish_release }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="build-${GITHUB_RUN_NUMBER}"
+          RE='(^|/)android/keystore/|(^|/)key\.properties$|\.jks$|\.keystore$'
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 1) signing keys inside project ZIPs
+          while IFS= read -r -d '' z; do
+            list="$(unzip -Z1 "$z" 2>/dev/null || true)"
+            if grep -qE "$RE" <<<"$list"; then
+              echo "removing signing key from: $z"
+              zip -q -d "$z" '*android/keystore/*' '*key.properties' '*.jks' '*.keystore' || true
+              git add -- "$z"
+            fi
+          done < <(git ls-files -z -- '*.zip')
+
+          # 2) key files committed directly
+          while IFS= read -r -d '' f; do
+            if grep -qE "$RE" <<<"$f"; then
+              echo "removing from source: $f"
+              git rm -q --cached -- "$f"
+            fi
+          done < <(git ls-files -z)
+
+          # 3) verify before tagging
+          if git ls-files | grep -qE "$RE"; then
+            echo "::error::a key file is still tracked"; exit 1
+          fi
+          while IFS= read -r -d '' z; do
+            list="$(unzip -Z1 "$z" 2>/dev/null || true)"
+            if grep -qE "$RE" <<<"$list"; then
+              echo "::error::signing key still inside $z"; exit 1
+            fi
+          done < <(git ls-files -z -- '*.zip')
+
+          git commit -q --allow-empty -m "Release $TAG (signing key removed from source)"
+          git tag -f "$TAG"
+          git push origin "refs/tags/$TAG" --force
+
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "Abtin build ${GITHUB_RUN_NUMBER}" --notes "APK ZIPs are added as each build finishes."
+
+  apk:
+    name: ${{ matrix.name }} · ${{ matrix.abi }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # more patient Gradle downloads (Maven / plugin repos)
+      GRADLE_OPTS: -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.repository.max.retries=6 -Dorg.gradle.internal.repository.initial.backoff=2000
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(inputs.max_parallel || '20') }}
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+
+    steps:
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: false          # keep Android SDK: sdkmanager and flutter build need it
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: true
+          swap-storage: true
+
+      - name: Show free disk space
+        shell: bash
+        run: df -h /
+
+      # only the needed ZIP is checked out (empty zip = whole repository)
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: ${{ matrix.zip }}
+          sparse-checkout-cone-mode: false
+
+      - name: Find and unzip project
+        id: src
+        shell: bash
+        env:
+          ZIP_INPUT: ${{ matrix.zip }}
+          NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          ZIP="$ZIP_INPUT"
+          rm -rf "$RUNNER_TEMP/src"
+          mkdir -p "$RUNNER_TEMP/src"
+          if [ -n "$ZIP" ]; then
+            [ -f "$ZIP" ] || { echo "::error::ZIP not found: $ZIP"; exit 1; }
+            echo "Building from ZIP: $ZIP"
+            unzip -q -o "$ZIP" -d "$RUNNER_TEMP/src"
+            ROOT="$RUNNER_TEMP/src"
+          else
+            echo "Building repository directly"
+            ROOT="$GITHUB_WORKSPACE"
+          fi
+          PUB="$(find "$ROOT" -maxdepth 5 -name pubspec.yaml -not -path '*/packages/*' -not -path '*/.dart_tool/*' \
+            | awk '{print length, $0}' | sort -n | head -1 | cut -d' ' -f2-)"
+          [ -n "$PUB" ] || { echo "::error::pubspec.yaml not found"; exit 1; }
+          echo "dir=$(dirname "$PUB")" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ inputs.flutter_version }}
+          cache: true
+
+      - name: Android SDK licenses and platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-37" "platform-tools" >/dev/null || true
+
+      # Always sign with the single upload key configured in GitHub Actions secrets.
+      # No project-local or temporary keystore fallback is allowed.
+      - name: Prepare Android project (GitHub-keystore signing)
+        working-directory: ${{ steps.src.outputs.dir }}
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          FLUTTER_ROOT_DIR="$(dirname "$(dirname "$(which flutter)")")"
+          mkdir -p android android/keystore
+          { echo "sdk.dir=${ANDROID_HOME:-$ANDROID_SDK_ROOT}"; echo "flutter.sdk=$FLUTTER_ROOT_DIR"; } > android/local.properties
+          chmod +x android/gradlew || true
+
+          # Fail early instead of silently producing an APK signed with a different key.
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::GitHub Actions secret $name is missing. Configure it in Settings > Secrets and variables > Actions."
+              exit 1
+            fi
+          done
+
+          KEYSTORE_FILE="android/keystore/github-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+          [ -s "$KEYSTORE_FILE" ] || { echo "::error::Decoded GitHub keystore is empty"; exit 1; }
+          chmod 600 "$KEYSTORE_FILE"
+          EFFECTIVE_KEY_PASSWORD="${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+
+          # Validate the password and alias before starting the expensive Flutter build.
+          keytool -list -keystore "$KEYSTORE_FILE" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+
+          printf 'storeFile=keystore/github-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$EFFECTIVE_KEY_PASSWORD" > android/key.properties
+          chmod 600 android/key.properties
+          echo "GitHub Actions keystore decoded and validated successfully"
+
+      # libgojni.so (Xray core) in the project is arm64-v8a only. PattNG ships the same core for every ABI inside libv2ray.aar
+      # (patterniha/AndroidLibXrayLite release). It is used only when its JNI exports are identical to the arm64 lib in the
+      # project (the hand-written Java bindings match that build); otherwise this ABI is built without v2ray
+      # and the v2ray page shows "unsupported_abi".
+      - name: v2ray core for ${{ matrix.abi }}
+        if: matrix.abi != 'arm64-v8a'
+        working-directory: ${{ steps.src.outputs.dir }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          XRAY_TAG: ${{ inputs.xray_tag }}
+          ABI: ${{ matrix.abi }}
+        run: |
+          set +e
+          ws="$PWD"
+          mkdir -p /tmp/aar && cd /tmp/aar
+          for i in 1 2 3; do
+            if [ -n "$XRAY_TAG" ]; then
+              gh release download "$XRAY_TAG" --repo patterniha/AndroidLibXrayLite --pattern libv2ray.aar
+            else
+              gh release download --repo patterniha/AndroidLibXrayLite --pattern libv2ray.aar
+            fi
+            [ -f libv2ray.aar ] && break
+            echo "download attempt $i failed, retrying in 15s"; sleep 15
+          done
+          [ -f libv2ray.aar ] || { echo "::warning::libv2ray.aar not downloaded: $ABI builds without the v2ray core"; exit 0; }
+          unzip -q -o libv2ray.aar 'jni/*' -d x
+          repo_fp=$(python3 "$ws/tools/jni_syms.py" "$ws/android/app/src/main/jniLibs/arm64-v8a/libgojni.so")
+          aar_fp=$(python3 "$ws/tools/jni_syms.py" x/jni/arm64-v8a/libgojni.so)
+          src="x/jni/$ABI/libgojni.so"
+          echo "project arm64: $repo_fp"; echo "aar     arm64: $aar_fp"
+          [ -f "$src" ] || { echo "::warning::AAR has no $ABI libgojni.so"; exit 0; }
+          [ "$repo_fp" = "$aar_fp" ] || { echo "::warning::AAR JNI exports differ from the bundled arm64 core (set xray_tag to the matching release): $ABI builds without v2ray"; exit 0; }
+          mkdir -p "$ws/android/app/src/main/jniLibs/$ABI"
+          cp "$src" "$ws/android/app/src/main/jniLibs/$ABI/libgojni.so"
+          echo "v2ray core for $ABI added"
+
+      - name: Get dependencies
+        working-directory: ${{ steps.src.outputs.dir }}
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            flutter pub get && exit 0
+            echo "pub get attempt $i failed, retrying in 20s"; sleep 20
+          done
+          exit 1
+
+      # Gradle caches survive between runs, and also between failed attempts (saved with `always()`),
+      # so every download that succeeded once is never fetched from GitHub again.
+      - name: Restore Gradle cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ matrix.name }}-${{ matrix.abi }}-${{ github.run_id }}
+          restore-keys: |
+            gradle-${{ matrix.name }}-${{ matrix.abi }}-
+            gradle-${{ matrix.name }}-
+            gradle-
+
+      # The Gradle distribution is downloaded from github.com (services.gradle.org redirects there). When GitHub
+      # answers 504, fall back to a public mirror of the same file.
+      - name: Make sure the Gradle distribution is downloadable
+        working-directory: ${{ steps.src.outputs.dir }}
+        shell: bash
+        run: |
+          props="android/gradle/wrapper/gradle-wrapper.properties"
+          [ -f "$props" ] || { echo "no wrapper properties, skipped"; exit 0; }
+          url="$(grep '^distributionUrl=' "$props" | cut -d= -f2- | sed 's#\\:#:#')"
+          file="$(basename "$url")"
+          echo "wrapper url: $url"
+          if ls ~/.gradle/wrapper/dists/"${file%.zip}"* >/dev/null 2>&1; then echo "already in cache"; exit 0; fi
+          for i in 1 2 3; do
+            curl -fsIL --max-time 40 "$url" -o /dev/null && { echo "primary URL ok"; exit 0; }
+            echo "primary URL failed (attempt $i)"; sleep 10
+          done
+          mirror="https://mirrors.cloud.tencent.com/gradle/$file"
+          if curl -fsIL --max-time 40 "$mirror" -o /dev/null; then
+            echo "::warning::using mirror $mirror"
+            sed -i "s#^distributionUrl=.*#distributionUrl=${mirror/:/\\\\:}#" "$props"
+          else
+            echo "::warning::mirror not reachable either, build will retry the original URL"
+          fi
+
+      - name: Analyze
+        working-directory: ${{ steps.src.outputs.dir }}
+        continue-on-error: true
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      # Retries because GitHub downloads (Gradle distribution, Kotlin compiler, media_kit jars) sometimes return 504
+      # for several minutes. Waits: 1, 2, 3, 4 min. Everything already downloaded stays in ~/.gradle between attempts.
+      - name: Build release APK (${{ matrix.abi }})
+        working-directory: ${{ steps.src.outputs.dir }}
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5; do
+            flutter build apk --release --split-per-abi --target-platform ${{ matrix.platform }} --split-debug-info=build/symbols && exit 0
+            echo "::warning::build attempt $i failed, retrying in $((i*60))s"
+            [ "$i" = 5 ] || sleep $((i*60))
+          done
+          echo "::error::build failed after 5 attempts"
+          exit 1
+
+      - name: Save Gradle cache
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ matrix.name }}-${{ matrix.abi }}-${{ github.run_id }}
+
+      - name: Check the APK holds only ${{ matrix.abi }}
+        working-directory: ${{ steps.src.outputs.dir }}
+        shell: bash
+        run: |
+          apk="build/app/outputs/flutter-apk/app-${{ matrix.abi }}-release.apk"
+          [ -f "$apk" ] || { echo "::error::APK was not generated"; exit 1; }
+          abis=$(unzip -Z1 "$apk" | grep -oE '^lib/[^/]+/' | sort -u | tr -d '\n')
+          echo "native ABIs in APK: $abis"
+          [ "$abis" = "lib/${{ matrix.abi }}/" ] || { echo "::error::wrong ABI set"; exit 1; }
+          if grep -rqi "geckoview" android --include=*.gradle --include=*.kts --include=*.properties 2>/dev/null; then
+            unzip -Z1 "$apk" | grep -q "lib/${{ matrix.abi }}/libxul.so" || { echo "::error::GeckoView libxul.so missing"; exit 1; }
+          else
+            echo "GeckoView not used by this project: libxul check skipped"
+          fi
+          if unzip -Z1 "$apk" | grep -q "lib/${{ matrix.abi }}/libgojni.so"; then echo "v2ray core: included"; else echo "v2ray core: NOT included for this ABI"; fi
+
+      # One ZIP per APK, made right here: nothing waits for the other jobs.
+      - name: Zip APK
+        shell: bash
+        env:
+          APP_NAME: ${{ steps.src.outputs.name }}
+          PROJECT_DIR: ${{ steps.src.outputs.dir }}
+          ABI: ${{ matrix.abi }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp "$PROJECT_DIR/build/app/outputs/flutter-apk/app-$ABI-release.apk" "dist/${APP_NAME}-${ABI}.apk"
+          zip -9 -X -j "dist/${APP_NAME}-${ABI}.zip" "dist/${APP_NAME}-${ABI}.apk"
+          rm "dist/${APP_NAME}-${ABI}.apk"
+          ls -lh dist
+
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-${{ matrix.abi }}
+          path: dist/*.zip
+          compression-level: 0
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release
+        if: ${{ needs.plan.outputs.release == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          ls -lh dist
+          # the plan job normally created the release already; create it here if it is missing
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Abtin build ${GITHUB_RUN_NUMBER}" --notes "APK ZIPs are added as each build finishes." || true
+          for i in 1 2 3 4 5; do
+            gh release upload "$TAG" dist/*.zip --clobber --repo "$GITHUB_REPOSITORY" && { echo "uploaded to release $TAG"; exit 0; }
+            echo "upload attempt $i failed, retrying in 20s"; sleep 20
+          done
+          echo "::error::could not attach to release $TAG"
+          exit 1
