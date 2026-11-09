@@ -112,6 +112,7 @@ class LocationService {
   DateTime? _lastStallRestartAt;
   static const Duration _stallTimeout = Duration(seconds: 12);
   static const Duration _stallRestartCooldown = Duration(seconds: 20);
+  static const Duration _idleStallTimeout = Duration(seconds: 45);
 
   /// Free-drive mode uses a 3 m distance filter, so a parked phone legitimately
   /// produces no GPS callbacks. Restarting the stream in that case only burns battery.
@@ -127,9 +128,10 @@ class LocationService {
       if (_disposed) return;
       final last = _lastRawCallbackAt ?? _lastGpsFixAt;
       if (last == null) return;
-      if (_isIdleWithoutNavigation) return;
       final now = DateTime.now();
-      if (now.difference(last) < _stallTimeout) return;
+      final timeout =
+          _isIdleWithoutNavigation ? _idleStallTimeout : _stallTimeout;
+      if (now.difference(last) < timeout) return;
       final lastRestart = _lastStallRestartAt;
       if (lastRestart != null &&
           now.difference(lastRestart) < _stallRestartCooldown) {
@@ -147,7 +149,12 @@ class LocationService {
       start();
       return;
     }
-    if (_isIdleWithoutNavigation) return;
+    if (last != null && _isIdleWithoutNavigation) {
+      // Parked phone + 3 m filter legitimately yields no callbacks, but a dead
+      // stream must still be revived eventually.
+      if (DateTime.now().difference(last) > _idleStallTimeout) start();
+      return;
+    }
     if (last == null) {
       if (started == null ||
           DateTime.now().difference(started) > const Duration(seconds: 15)) {
@@ -710,7 +717,10 @@ class LocationService {
     final now = DateTime.now();
     final gap = now.difference(_lastGpsFixAt!);
     if (gap < _gpsGapBeforePrediction || gap > _maxGpsPredictionGap) return;
-    final predicted = _jointKalman.predictOnly(now.millisecondsSinceEpoch);
+    final baseTs = _lastAcceptedRawTsMs;
+    if (baseTs == null) return;
+    // Same clock as the GPS fixes (fix time + time elapsed since it arrived).
+    final predicted = _jointKalman.predictOnly(baseTs + gap.inMilliseconds);
     if (predicted == null || predicted.speedMs < 0.35) return;
     if (!_isPredictingGpsGap) {
       _isPredictingGpsGap = true;

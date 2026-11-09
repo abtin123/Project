@@ -85,10 +85,13 @@ class JointKalmanFilter2D {
       return raw;
     }
 
-    final timestampDeltaMs = raw.timestampMs - _lastTimestampMs;
+    var timestampDeltaMs = raw.timestampMs - _lastTimestampMs;
     if (timestampDeltaMs < -250) {
-      return _sampleFromState(_lastTimestampMs,
-          fallbackBearingDeg: raw.bearingDeg);
+      // Timestamp went backwards (clock skew / out-of-order fix). Returning the
+      // old state here froze the position and speed until the clock caught up,
+      // so resync to this fix and keep filtering instead.
+      _lastTimestampMs = raw.timestampMs;
+      timestampDeltaMs = 0;
     }
     final dt = (timestampDeltaMs / 1000.0).clamp(0.0, 10.0);
     if (dt > 0) {
@@ -206,12 +209,23 @@ class JointKalmanFilter2D {
     return variance * ratio * ratio;
   }
 
+  /// Extrapolates the last filtered state to [timestampMs] WITHOUT changing the
+  /// filter (state, covariance or clock). [timestampMs] must be in the same
+  /// clock domain as the fixes passed to [process].
   KalmanLocationSample? predictOnly(int timestampMs) {
     if (!_initialized || timestampMs <= _lastTimestampMs) return null;
-    final dt = ((timestampMs - _lastTimestampMs) / 1000.0).clamp(0.01, 1.0);
-    _lastTimestampMs = timestampMs;
-    _predict(dt);
-    return _sampleFromState(timestampMs);
+    final dt = ((timestampMs - _lastTimestampMs) / 1000.0).clamp(0.01, 15.0);
+    final base = _sampleFromState(timestampMs);
+    final x = _x + _vx * dt;
+    final y = _y + _vy * dt;
+    return KalmanLocationSample(
+      latitude: _metersToLat(y, _refLat),
+      longitude: _metersToLng(x, _refLat, _refLng),
+      speedMs: base.speedMs,
+      bearingDeg: base.bearingDeg,
+      accuracyMeters: base.accuracyMeters,
+      timestampMs: timestampMs,
+    );
   }
 
   void _predict(double dt, {double extraProcessNoise = 0.0}) {
