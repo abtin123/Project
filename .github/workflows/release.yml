@@ -814,9 +814,43 @@ jobs:
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $TAG exists: updating its files."
           else
+            # GitHub auto-attaches "Source code (zip/tar.gz)" = the repo at the tag.
+            # The repo contains the ORIGINAL source ZIP (with keystore), so tag a
+            # separate orphan commit that holds ONLY the clean source.
+            remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+            if git ls-remote --exit-code --tags "$remote" "refs/tags/$TAG" >/dev/null 2>&1; then
+              echo "::warning::Tag $TAG already exists: using it as is (its auto source archive may contain the original ZIP)."
+            else
+              clean_zip="$(ls dist/*-source.zip | head -n1)"
+              tree="$RUNNER_TEMP/clean-tag"
+              rm -rf "$tree"; mkdir -p "$tree"
+              unzip -q "$clean_zip" -d "$tree"
+
+              # GITHUB_TOKEN cannot push workflow files
+              find "$tree" -type d -path '*/.github/workflows' -prune -exec rm -rf {} +
+
+              # last safety net
+              if find "$tree" -type f \( -iname '*.p12' -o -iname '*.jks' -o -iname '*.keystore' \
+                     -o -iname '*.pem' -o -iname 'key.properties' \) | grep -q .; then
+                echo '::error::key file in clean tag tree'
+                exit 1
+              fi
+
+              cd "$tree"
+              git init -q -b clean-source
+              git config user.name  "github-actions"
+              git config user.email "github-actions@github.com"
+              git add -A
+              git commit -q -m "Clean source for $TAG (no signing files)"
+              git tag "$TAG"
+              git push "$remote" "refs/tags/$TAG"
+              cd - >/dev/null
+            fi
+
             gh release create "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" \
+              --verify-tag \
               --title "$title" \
               --notes "$title"
           fi
