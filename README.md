@@ -150,7 +150,7 @@ When reporting an issue, include the application version, operating system versi
 
 **Abtin Maps — Offline Navigation Platform**
 
-Repository: https://github.com/abtin123/abtin-maps
+Repository: https://github.com/abtin123/project
 
 ---
 
