@@ -1,0 +1,95 @@
+name: Publish Android APKs from Existing Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "GitHub Actions run ID that contains the android-release artifact"
+        required: true
+        default: "43722194188"
+        type: string
+      release_tag:
+        description: "Release tag to publish the APKs under"
+        required: true
+        default: "v0.0.17"
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: publish-android-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish the three ABI APKs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Android files from the selected existing run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          gh run download "$SOURCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name android-release \
+            --dir release-assets
+
+      - name: Validate all release files
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          required=(
+            "abtin_maps-${RELEASE_TAG}-armeabi-v7a.apk"
+            "abtin_maps-${RELEASE_TAG}-arm64-v8a.apk"
+            "abtin_maps-${RELEASE_TAG}-x86_64.apk"
+            "abtin_maps-${RELEASE_TAG}-universal.apk"
+            "abtin_maps-${RELEASE_TAG}-universal.apk.zip"
+            "abtin_maps-${RELEASE_TAG}.aab.zip"
+          )
+
+          for file in "${required[@]}"; do
+            if [[ ! -s "release-assets/$file" ]]; then
+              echo "::error::Missing or empty release asset: $file"
+              echo "Files downloaded from the selected run:"
+              find release-assets -maxdepth 2 -type f -printf '%P (%s bytes)\n'
+              exit 1
+            fi
+          done
+
+          echo "Validated APKs for armeabi-v7a, arm64-v8a and x86_64."
+          find release-assets -maxdepth 1 -type f -printf '%f (%s bytes)\n' | sort
+
+      - name: Publish assets to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-assets/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" release-assets/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Abtin Maps $RELEASE_TAG" \
+              --notes "Android release built by GitHub Actions. Includes separate APKs for armeabi-v7a, arm64-v8a and x86_64, plus universal APK and AAB archive."
+          fi
+
+      - name: Show published release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json url,assets \
+            --jq '{url: .url, assets: [.assets[].name]}'
