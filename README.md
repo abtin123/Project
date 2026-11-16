@@ -1,4 +1,4 @@
-<div align="center">
+ <div align="center">
 
 # 🗺️ آبتین Maps · Abtin Maps
 
@@ -7,7 +7,8 @@
 
 *سریع · ساده · رایگان — Fast · Simple · Free*
 
-![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
+![Android](https://img.shields.io/badge/Android-Supported-3DDC84?style=for-the-badge&logo=android&logoColor=white)
+![iOS](https://img.shields.io/badge/iOS-Supported-000000?style=for-the-badge&logo=apple&logoColor=white)
 ![Maps](https://img.shields.io/badge/Maps-OpenStreetMap-7EBC6F?style=for-the-badge&logo=openstreetmap&logoColor=white)
 ![Offline](https://img.shields.io/badge/Offline-Supported-2563EB?style=for-the-badge)
 ![AR](https://img.shields.io/badge/AR-Ready-8B5CF6?style=for-the-badge)
@@ -27,23 +28,25 @@
 
 ## ✨ معرفی
 
-**آبتین Maps** یک اپلیکیشن رایگان نقشه و مسیریابی است که با هدف ارائه‌ی تجربه‌ای **ساده، سریع و کاربردی** برای مشاهده‌ی نقشه، پیدا کردن مکان‌ها و مسیریابی طراحی شده است.
+**آبتین Maps** یک اپلیکیشن رایگان نقشه و مسیریابی برای سیستم‌عامل‌های **Android و iOS** است که با هدف ارائه‌ی تجربه‌ای **ساده، سریع و کاربردی** برای مشاهده‌ی نقشه، پیدا کردن مکان‌ها و مسیریابی طراحی شده است.
 
 این برنامه با استفاده از داده‌های **OpenStreetMap** قابلیت‌های مختلف مسیریابی را فراهم می‌کند و از **نقشه‌های آفلاین** نیز پشتیبانی می‌کند تا بتوانید بدون نیاز دائمی به اینترنت از نقشه استفاده کنید.
+
+آبتین Maps با تمرکز بر عملکرد سریع، رابط کاربری مدرن و امکانات کاربردی، تلاش می‌کند تجربه‌ای مناسب برای استفاده روزمره و رانندگی ارائه دهد.
 
 ## 🚀 امکانات
 
 | | امکانات |
 |---|---|
-| 🌍 | نمایش نقشه‌های دقیق بر پایه‌ی OpenStreetMap |
+| 🌍 | نمایش نقشه‌های دقیق بر پایه OpenStreetMap |
 | 🧭 | مسیریابی و نمایش مسیر روی نقشه |
 | 📴 | پشتیبانی از مسیریابی آفلاین |
 | 💾 | پشتیبانی از نقشه‌های آفلاین |
 | 📍 | نمایش موقعیت فعلی کاربر |
 | 🧲 | قطب‌نما و نمایش جهت شمال |
 | 🚗 | نمایش سرعت لحظه‌ای خودرو |
-| 🏠 | تعیین و ذخیره‌ی خانه و محل کار |
-| ⭐ | ذخیره‌ی مکان‌های موردعلاقه |
+| 🏠 | تعیین و ذخیره خانه و محل کار |
+| ⭐ | ذخیره مکان‌های موردعلاقه |
 | 🔎 | جست‌وجوی مکان‌ها و معابر |
 | 🗂️ | انتخاب و مدیریت نقشه‌های مناطق مختلف |
 | 🌙 | حالت شب برای رانندگی راحت‌تر |
@@ -51,7 +54,13 @@
 | 💎 | رابط کاربری مدرن با طراحی Glass |
 | 🌐 | پشتیبانی از زبان‌های مختلف |
 | 🥽 | قابلیت واقعیت افزوده (AR) |
-| ⚡ | طراحی با تمرکز بر استفاده‌ی آسان و سریع هنگام رانندگی |
+| ⚡ | طراحی با تمرکز بر استفاده آسان و سریع هنگام رانندگی |
+| 📱 | پشتیبانی از سیستم‌عامل‌های Android و iOS |
+
+## 📱 پلتفرم‌های پشتیبانی‌شده
+
+- Android
+- iOS
 
 ## 🔐 مجوزهای برنامه
 
@@ -71,6 +80,7 @@
 ## 🗺️ منبع داده‌های نقشه
 
 داده‌های نقشه از پروژه‌ی **[OpenStreetMap](https://www.openstreetmap.org)** تهیه شده است؛ یک پروژه‌ی آزاد و مشارکتی برای ساخت نقشه‌ی جهانی.
+
 آبتین Maps یک برنامه‌ی مستقل است و وابستگی یا وابستگی تجاری مستقیمی به بنیاد OpenStreetMap ندارد.
 
 ## 🎨 درباره‌ی مدل‌های سه‌بعدی (GLB)
@@ -97,9 +107,11 @@
 
 ## ✨ About
 
-**Abtin Maps** is a free mapping and navigation app designed to deliver a **simple, fast, and practical** experience for viewing maps, finding places, and navigating to your destination.
+**Abtin Maps** is a free mapping and navigation application for **Android and iOS**, designed to deliver a **simple, fast, and practical** experience for viewing maps, finding places, and navigating to your destination.
 
-Powered by **OpenStreetMap** data, it offers a range of navigation features and supports **offline maps**, so you can use it without a constant internet connection.
+Powered by **OpenStreetMap** data, it offers a range of navigation features and supports **offline maps**, allowing you to use maps without a constant internet connection.
+
+Abtin Maps focuses on fast performance, a modern user interface, and practical features for everyday use and driving.
 
 ## 🚀 Features
 
@@ -122,6 +134,12 @@ Powered by **OpenStreetMap** data, it offers a range of navigation features and 
 | 🌐 | Multi-language support |
 | 🥽 | Augmented Reality (AR) functionality |
 | ⚡ | Designed for ease of use and quick access while driving |
+| 📱 | Supports Android and iOS operating systems |
+
+## 📱 Supported Platforms
+
+- Android
+- iOS
 
 ## 🔐 Permissions
 
@@ -141,6 +159,7 @@ Powered by **OpenStreetMap** data, it offers a range of navigation features and 
 ## 🗺️ Map Data Source
 
 Map data comes from **[OpenStreetMap](https://www.openstreetmap.org)**, an open, collaborative project dedicated to creating a global map.
+
 Abtin Maps is an independent application with no direct affiliation with, or commercial dependency on, the OpenStreetMap Foundation.
 
 ## 🎨 About the 3D GLB Models
@@ -161,9 +180,9 @@ Abtin Maps uses several 3D models in GLB format to display vehicles and graphica
 
 <div align="center">
 
-**Abtin Maps** is completely free — built to be a practical, accessible navigation tool.
-<br>
-**آبتین Maps کاملاً رایگان است** و هدفش ارائه‌ی ابزاری کاربردی و در دسترس برای نقشه و مسیریابی است.
+**Abtin Maps** is completely free — built to be a practical, accessible navigation tool for Android and iOS.
+
+**آبتین Maps کاملاً رایگان است** و هدفش ارائه‌ی ابزاری کاربردی و در دسترس برای نقشه و مسیریابی در اندروید و iOS است.
 
 Made with ❤️ by Abtin
 
