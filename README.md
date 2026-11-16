@@ -1,163 +1,170 @@
-# Abtin Maps | آبتین مپس
+<div align="center">
 
-<p align="center">
-  <strong>Offline Navigation. Smarter Journeys.</strong>
-  <br/>
-  <strong>مسیریابی هوشمند، مستقل از اینترنت</strong>
-</p>
+# 🗺️ آبتین Maps · Abtin Maps
 
-<p align="center">
-  <em>A modern offline-first navigation platform built for reliable, intelligent, and seamless journeys.</em>
-</p>
+### نقشه و مسیریابی آفلاین و آنلاین
+### Offline & Online Maps and Navigation
+
+*سریع · ساده · رایگان — Fast · Simple · Free*
+
+![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
+![Maps](https://img.shields.io/badge/Maps-OpenStreetMap-7EBC6F?style=for-the-badge&logo=openstreetmap&logoColor=white)
+![Offline](https://img.shields.io/badge/Offline-Supported-2563EB?style=for-the-badge)
+![AR](https://img.shields.io/badge/AR-Ready-8B5CF6?style=for-the-badge)
+![Price](https://img.shields.io/badge/Price-Free-F59E0B?style=for-the-badge)
+
+[🇮🇷 فارسی](#-فارسی) &nbsp;•&nbsp; [🇬🇧 English](#-english)
+
+</div>
 
 ---
 
-## 🇮🇷 فارسی
+<a name="-فارسی"></a>
 
-### درباره آبتین مپس
+<div dir="rtl" align="right">
 
-**آبتین مپس (Abtin Maps)** یک پروژه مسیریابی و ناوبری نسل جدید است که با تمرکز بر نقشه‌های آفلاین، مسیریابی هوشمند و تجربه کاربری روان توسعه داده می‌شود.
+# 🇮🇷 فارسی
 
-هدف آبتین مپس فراهم‌کردن تجربه‌ای قابل‌اعتماد از ناوبری است؛ تجربه‌ای که برای استفاده روزمره، سفرهای بین‌شهری و مسیرهای طولانی به اتصال دائمی اینترنت وابسته نباشد.
+## ✨ معرفی
 
-معماری پروژه به‌گونه‌ای طراحی شده است که داده‌های نقشه، اطلاعات جست‌وجو و نقاط موردعلاقه و داده‌های موردنیاز مسیریابی بتوانند به‌صورت محلی مدیریت و پردازش شوند.
+**آبتین Maps** یک اپلیکیشن رایگان نقشه و مسیریابی است که با هدف ارائه‌ی تجربه‌ای **ساده، سریع و کاربردی** برای مشاهده‌ی نقشه، پیدا کردن مکان‌ها و مسیریابی طراحی شده است.
 
-### قابلیت‌ها و اهداف اصلی
+این برنامه با استفاده از داده‌های **OpenStreetMap** قابلیت‌های مختلف مسیریابی را فراهم می‌کند و از **نقشه‌های آفلاین** نیز پشتیبانی می‌کند تا بتوانید بدون نیاز دائمی به اینترنت از نقشه استفاده کنید.
 
-- **نقشه‌های آفلاین:** امکان استفاده از داده‌های نقشه ذخیره‌شده روی دستگاه، بدون وابستگی دائمی به سرویس نقشه آنلاین.
-- **مسیریابی آفلاین:** طراحی موتور مسیریابی برای محاسبه مسیرهای شهری و بین‌شهری با استفاده از داده‌های محلی.
-- **جست‌وجوی مکان‌ها:** معماری جست‌وجوی محلی برای دسترسی به اطلاعات مکان‌ها، خیابان‌ها و نقاط موردعلاقه.
-- **اطلاعات مسیر:** پشتیبانی معماری نقشه از اطلاعاتی مانند محدودیت‌های جاده‌ای، جهت حرکت، سرعت مجاز و سایر مشخصات مسیر، متناسب با داده‌های موجود.
-- **مدیریت نقشه‌ها:** ساختار بسته‌های نقشه اختصاصی ABM با قابلیت توسعه برای پوشش مناطق مختلف.
-- **نمایش نقشه:** توسعه سیستم نمایش نقشه با هدف ارائه تجربه‌ای روان، دقیق و خوانا در سطوح مختلف بزرگ‌نمایی.
-- **نمایش سه‌بعدی خودرو:** توسعه نمایشگر سه‌بعدی مبتنی بر Filament برای نمایش مدل خودرو در محیط ناوبری.
-- **راهنمای صوتی:** طراحی راهنمای صوتی مسیر با تمرکز بر اعلان‌های ضروری و جلوگیری از تکرار پیام‌های غیرضروری.
-- **رابط کاربری چندزبانه:** پشتیبانی از توسعه رابط کاربری فارسی و انگلیسی و معماری قابل گسترش برای زبان‌های دیگر.
+## 🚀 امکانات
 
-### فناوری‌ها
-
-| فناوری | کاربرد |
+| | امکانات |
 |---|---|
-| Flutter / Dart | توسعه رابط کاربری و منطق اصلی اپلیکیشن |
-| Android Native | یکپارچه‌سازی قابلیت‌های بومی اندروید |
-| Filament | رندرینگ سه‌بعدی مدل خودرو |
-| SQLite | ذخیره‌سازی و بازیابی داده‌های مکانی |
-| ABM | قالب اختصاصی بسته‌بندی داده‌های نقشه |
-| MBTiles | نگهداری داده‌های کاشی نقشه در معماری فعلی |
-| GitHub Actions | خودکارسازی فرایندهای ساخت و انتشار |
+| 🌍 | نمایش نقشه‌های دقیق بر پایه‌ی OpenStreetMap |
+| 🧭 | مسیریابی و نمایش مسیر روی نقشه |
+| 📴 | پشتیبانی از مسیریابی آفلاین |
+| 💾 | پشتیبانی از نقشه‌های آفلاین |
+| 📍 | نمایش موقعیت فعلی کاربر |
+| 🧲 | قطب‌نما و نمایش جهت شمال |
+| 🚗 | نمایش سرعت لحظه‌ای خودرو |
+| 🏠 | تعیین و ذخیره‌ی خانه و محل کار |
+| ⭐ | ذخیره‌ی مکان‌های موردعلاقه |
+| 🔎 | جست‌وجوی مکان‌ها و معابر |
+| 🗂️ | انتخاب و مدیریت نقشه‌های مناطق مختلف |
+| 🌙 | حالت شب برای رانندگی راحت‌تر |
+| 🚘 | نمایش خودرو به‌صورت سه‌بعدی روی نقشه |
+| 💎 | رابط کاربری مدرن با طراحی Glass |
+| 🌐 | پشتیبانی از زبان‌های مختلف |
+| 🥽 | قابلیت واقعیت افزوده (AR) |
+| ⚡ | طراحی با تمرکز بر استفاده‌ی آسان و سریع هنگام رانندگی |
 
-### معماری داده‌های نقشه
+## 🔐 مجوزهای برنامه
 
-آبتین مپس از قالب اختصاصی **ABM** برای بسته‌بندی داده‌های نقشه استفاده می‌کند.
-
-در معماری فعلی، داده‌های استخراج‌شده از بسته نقشه در دو بخش اصلی مدیریت می‌شوند:
-
-- `map.mbtile` — داده‌های کاشی موردنیاز برای نمایش نقشه.
-- `map.sqlite` — داده‌های ساختاریافته موردنیاز برای جست‌وجو، مکان‌ها و اطلاعات مسیریابی.
-
-این تفکیک با هدف کاهش مصرف حافظه، دسترسی سریع‌تر به اطلاعات و جلوگیری از بارگذاری غیرضروری کل پایگاه داده در حافظه طراحی شده است.
-
-### وضعیت توسعه
-
-آبتین مپس یک پروژه در حال توسعه است. قابلیت‌ها و اجزای مختلف آن به‌صورت مرحله‌ای پیاده‌سازی، آزمایش و بهینه‌سازی می‌شوند.
-
-وضعیت هر قابلیت ممکن است با انتشار نسخه‌های جدید تغییر کند. بنابراین توضیحات این README بیانگر جهت‌گیری و معماری پروژه هستند و لزوماً به معنی تکمیل تمام قابلیت‌ها در نسخه فعلی نیستند.
-
-### مشارکت در توسعه
-
-مشارکت توسعه‌دهندگان، گزارش دقیق خطاها و ارائه پیشنهادهای فنی می‌تواند به بهبود پروژه کمک کند.
-
-برای مشارکت:
-
-1. مخزن را Fork کنید.
-2. یک Branch مستقل برای تغییرات خود بسازید.
-3. تغییرات را با توضیح فنی روشن ثبت کنید.
-4. یک Pull Request ارسال کنید.
-
-در گزارش خطا، نسخه اپلیکیشن، نسخه سیستم‌عامل، مراحل بازتولید مشکل و گزارش‌های مرتبط را درج کنید.
-
----
-
-## 🇬🇧 English
-
-### About Abtin Maps
-
-**Abtin Maps** is a next-generation navigation project focused on offline maps, intelligent routing, and a smooth, reliable navigation experience.
-
-The project aims to make everyday navigation and long-distance travel less dependent on continuous internet connectivity.
-
-Its architecture is designed to manage map content, search data, points of interest, and routing information locally, enabling navigation components to operate using data stored on the device.
-
-### Core Features & Development Goals
-
-- **Offline Maps:** Access locally stored map data without continuous reliance on online map services.
-- **Offline Routing:** Development of a routing engine designed to calculate urban and intercity routes using locally available data.
-- **Place Search:** A local search architecture for discovering locations, streets, and points of interest.
-- **Road Information:** Support for road attributes such as one-way restrictions, speed limits, road restrictions, and other routing-related information, subject to available map data.
-- **Map Management:** A dedicated ABM map-package structure designed to support different geographic regions.
-- **Map Rendering:** Development of a smooth and detailed map-rendering system across different zoom levels.
-- **3D Vehicle Visualization:** A Filament-based 3D rendering system for displaying vehicle models within the navigation environment.
-- **Voice Guidance:** Route guidance designed to prioritize relevant navigation instructions and minimize unnecessary repetition.
-- **Multilingual Interface:** Persian and English interface support, with an architecture designed for additional languages.
-
-### Technology Stack
-
-| Technology | Purpose |
+| مجوز | دلیل استفاده |
 |---|---|
-| Flutter / Dart | Application UI and core application logic |
-| Android Native | Native Android integration |
-| Filament | Real-time 3D vehicle rendering |
-| SQLite | Local geospatial data storage and queries |
-| ABM | Dedicated map data packaging format |
-| MBTiles | Map tile storage in the current architecture |
-| GitHub Actions | Automated build and release workflows |
+| 📷 **دوربین** | فقط برای قابلیت واقعیت افزوده (AR). دوربین برای جمع‌آوری، ذخیره یا ارسال اطلاعات شخصی استفاده نمی‌شود. |
+| 📡 **موقعیت مکانی (GPS)** | شناسایی موقعیت فعلی، نمایش موقعیت روی نقشه، مسیریابی و هدایت کاربر در مسیر. |
 
-### Map Data Architecture
+## 🛡️ حریم خصوصی
 
-Abtin Maps uses its dedicated **ABM** format to package offline map data.
+> آبتین Maps به حریم خصوصی شما اهمیت می‌دهد.
 
-The current extraction architecture separates the map data into two primary components:
+- هیچ‌گونه اطلاعات شخصی، موقعیت مکانی، مسیرهای طی‌شده، تصاویر دوربین یا داده‌های GPS روی **هیچ سرور یا محل دیگری ذخیره نمی‌شود**.
+- اطلاعات موردنیاز برنامه تا حد لازم **روی دستگاه خودتان** پردازش می‌شوند و برای ذخیره‌سازی به سرور یا شخص ثالث ارسال نمی‌شوند.
+- تصاویر دوربین فقط هنگام استفاده از AR به‌کار می‌روند و در هیچ سروری ذخیره نمی‌شوند.
 
-- `map.mbtile` — Stores map tile data used by the rendering system.
-- `map.sqlite` — Stores structured data used for search, places, and routing-related operations.
+## 🗺️ منبع داده‌های نقشه
 
-This separation is intended to improve data access efficiency, reduce unnecessary memory usage, and avoid loading the entire database into memory.
+داده‌های نقشه از پروژه‌ی **[OpenStreetMap](https://www.openstreetmap.org)** تهیه شده است؛ یک پروژه‌ی آزاد و مشارکتی برای ساخت نقشه‌ی جهانی.
+آبتین Maps یک برنامه‌ی مستقل است و وابستگی یا وابستگی تجاری مستقیمی به بنیاد OpenStreetMap ندارد.
 
-### Development Status
+## 🎨 درباره‌ی مدل‌های سه‌بعدی (GLB)
 
-Abtin Maps is an actively evolving project.
+در آبتین Maps برای نمایش خودرو و عناصر گرافیکی از تعدادی مدل سه‌بعدی با فرمت GLB استفاده شده است.
 
-Its components are being implemented, tested, and optimized incrementally. Feature availability may vary between development stages and releases.
+- این مدل‌ها از منابعی که آن‌ها را رایگان در اختیار کاربران گذاشته‌اند دریافت شده و با حفظ نام فایل‌های اصلی استفاده شده‌اند.
+- این مدل‌ها به‌عنوان آثار تولیدشده‌ی سازنده‌ی برنامه معرفی یا فروخته **نمی‌شوند** و هدف از استفاده‌ی آن‌ها فروش یا عرضه‌ی تجاری مستقل نیست.
+- آبتین Maps کاملاً رایگان است و هیچ هزینه‌ای از کاربران دریافت نمی‌شود.
 
-The features described in this document represent the project's architecture and development direction; they should not be interpreted as a guarantee that every feature is fully implemented in the current release.
+> اگر سازنده، صاحب حق یا منتشرکننده‌ی اصلی هر یک از مدل‌ها نسبت به استفاده از آن‌ها مشکلی دارد، می‌تواند از طریق ایمیل اطلاع دهد. پس از بررسی و تأیید مالکیت یا وجود محدودیت، فایل موردنظر حذف یا با مدل مجاز جایگزین خواهد شد.
 
-### Contributing
+## 📬 ارتباط با سازنده
 
-Contributions from developers, technical feedback, and well-documented bug reports are welcome.
+📧 **ایمیل:** [abtinmaps@gmail.com](mailto:abtinmaps@gmail.com)
 
-To contribute:
-
-1. Fork the repository.
-2. Create a dedicated branch for your changes.
-3. Commit your changes with clear technical descriptions.
-4. Submit a Pull Request.
-
-When reporting an issue, include the application version, operating system version, reproduction steps, and relevant logs whenever possible.
+</div>
 
 ---
 
-## Project Repository
+<a name="-english"></a>
 
-**Abtin Maps — Offline Navigation Platform**
+# 🇬🇧 English
 
-Repository: https://github.com/abtin123/project
+## ✨ About
+
+**Abtin Maps** is a free mapping and navigation app designed to deliver a **simple, fast, and practical** experience for viewing maps, finding places, and navigating to your destination.
+
+Powered by **OpenStreetMap** data, it offers a range of navigation features and supports **offline maps**, so you can use it without a constant internet connection.
+
+## 🚀 Features
+
+| | Feature |
+|---|---|
+| 🌍 | Accurate map display based on OpenStreetMap data |
+| 🧭 | Navigation and route display on the map |
+| 📴 | Offline navigation support |
+| 💾 | Offline maps support |
+| 📍 | Display of your current location |
+| 🧲 | Compass and north-direction indicator |
+| 🚗 | Real-time vehicle speed display |
+| 🏠 | Set and save Home and Work locations |
+| ⭐ | Save favorite places |
+| 🔎 | Search for places and streets |
+| 🗂️ | Select and manage maps for different regions |
+| 🌙 | Night mode for comfortable driving after dark |
+| 🚘 | 3D vehicle display on the map |
+| 💎 | Modern Glass-style user interface |
+| 🌐 | Multi-language support |
+| 🥽 | Augmented Reality (AR) functionality |
+| ⚡ | Designed for ease of use and quick access while driving |
+
+## 🔐 Permissions
+
+| Permission | Purpose |
+|---|---|
+| 📷 **Camera** | Used solely for the Augmented Reality (AR) feature. The camera is never used to collect, store, or transmit personal information. |
+| 📡 **Location (GPS)** | Determines your current location, shows your position on the map, and guides you along a route. |
+
+## 🛡️ Privacy
+
+> Abtin Maps values your privacy.
+
+- No personal information, location data, traveled routes, camera images, or GPS data is **stored on any server or elsewhere**.
+- Data needed for the app to function is **processed locally on your device** and is never sent to servers or third parties for storage.
+- Camera images are used only while AR is active and are never stored on any server.
+
+## 🗺️ Map Data Source
+
+Map data comes from **[OpenStreetMap](https://www.openstreetmap.org)**, an open, collaborative project dedicated to creating a global map.
+Abtin Maps is an independent application with no direct affiliation with, or commercial dependency on, the OpenStreetMap Foundation.
+
+## 🎨 About the 3D GLB Models
+
+Abtin Maps uses several 3D models in GLB format to display vehicles and graphical elements.
+
+- The models were obtained from sources that provide them for free, and original filenames have been preserved.
+- They are **not** presented or sold as original works by the developer, and are not used to sell or independently commercialize 3D models.
+- Abtin Maps is completely free; users are not charged for using it.
+
+> If any original creator, rights holder, or publisher has a concern about the use of a model, please contact us by email. After review, if ownership or a usage restriction is confirmed, the model will be removed or replaced with a permitted alternative.
+
+## 📬 Contact
+
+📧 **Email:** [abtinmaps@gmail.com](mailto:abtinmaps@gmail.com)
 
 ---
 
-<p align="center">
-  <strong>Abtin Maps</strong>
-  <br/>
-  <em>Navigate with confidence. Even offline.</em>
-  <br/>
-  <em>با اطمینان مسیریابی کن؛ حتی بدون اینترنت.</em>
-</p>
+<div align="center">
+
+**Abtin Maps** is completely free — built to be a practical, accessible navigation tool.
+<br>
+**آبتین Maps کاملاً رایگان است** و هدفش ارائه‌ی ابزاری کاربردی و در دسترس برای نقشه و مسیریابی است.
+
+Made with ❤️ by Abtin
+
+</div>
