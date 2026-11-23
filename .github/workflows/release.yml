@@ -1,4 +1,4 @@
-name: Release (Android + iOS)
+name: Release (Android iOS)
 
 # Put this at .github/workflows/release.yml
 #
@@ -9,11 +9,13 @@ name: Release (Android + iOS)
 #   <name>-<tag>-universal.apk            signed, universal APK (plain, for the in-app updater)
 #   <name>-<tag>-universal.apk.zip        the universal APK, zipped separately
 #   <name>-<tag>.aab.zip                  signed AAB, zipped (for Bazaar bundle-signer)
-#   <name>-<tag>.ipa                      iOS (signed if secrets exist, otherwise <name>-<tag>-unsigned.ipa)
+#   <name>-<tag>.ipa                      signed iOS IPA (requires iOS signing secrets)
 #   <name>-<tag>-source.zip               CLEAN source: no keystore / key.properties / certificates
 #
-# Android signing uses the keystore + android/key.properties that are INSIDE the source zip.
-# The zip that ships on the release is rebuilt from the original with every key file removed.
+# Android signing uses GitHub Actions Secrets (never signing files from the source ZIP):
+#   KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS
+# For this PKCS12 keystore, keyPassword is the same as KEYSTORE_PASSWORD.
+# The source ZIP and the GitHub tag source archive are both cleaned before publishing.
 
 on:
   workflow_dispatch:
@@ -174,7 +176,7 @@ jobs:
   # SOURCE: clean copy of the ZIP with every signing file removed
   # ==================================================================
   source:
-    name: Create clean source ZIP (no keystore)
+    name: Create clean source ZIP (no signing material)
     needs: prepare
     runs-on: ubuntu-latest
     steps:
@@ -199,6 +201,7 @@ jobs:
           find . -type f \( \
               -iname '*.p12' -o -iname '*.pfx' -o -iname '*.jks' -o -iname '*.keystore' \
               -o -iname '*.pem' -o -iname '*.crt' -o -iname '*.cer' -o -iname '*.key' \
+              -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*.mobileprovision' \
               -o -iname '*.mobileprovision' -o -iname '*.cer' \
               -o -iname 'key.properties' -o -iname 'keystore.properties' \
               -o -name 'local.properties' \) -delete
@@ -306,6 +309,9 @@ jobs:
           SOURCE_ZIP: ${{ needs.prepare.outputs.source_zip }}
           APP_SUBDIR: ${{ needs.prepare.outputs.app_subdir }}
           APP_NAME: ${{ needs.prepare.outputs.app_name }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           set -euo pipefail
 
@@ -325,19 +331,38 @@ jobs:
             exit 1
           }
 
-          # signing files must be inside the zip (they are removed from the public copy later)
-          test -f "$app_dir/android/key.properties" || {
-            echo 'android/key.properties is missing in the source ZIP.'
+          # Never use signing files supplied by the source ZIP.
+          # Recreate the Android signing configuration exclusively from GitHub Secrets.
+          : "${KEYSTORE_BASE64:?GitHub Secret KEYSTORE_BASE64 is not set}"
+          : "${KEYSTORE_PASSWORD:?GitHub Secret KEYSTORE_PASSWORD is not set}"
+          : "${KEY_ALIAS:?GitHub Secret KEY_ALIAS is not set}"
+
+          mkdir -p "$app_dir/android"
+          mkdir -p "$app_dir/android/app"
+          rm -f "$app_dir/android/key.properties" \
+                "$app_dir/android/abtinmaps.p12" \
+                "$app_dir/android/app/abtinmaps.p12"
+
+          # Recreate the PKCS12 only from GitHub Secrets.
+          # Keep a copy at both common Gradle lookup locations because older
+          # project build.gradle files differ in their file(...) base directory.
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$app_dir/android/app/abtinmaps.p12"
+          test -s "$app_dir/android/app/abtinmaps.p12" || {
+            echo 'Could not reconstruct Android keystore from KEYSTORE_BASE64.'
             exit 1
           }
+          cp "$app_dir/android/app/abtinmaps.p12" "$app_dir/android/abtinmaps.p12"
 
-          store_file="$(grep '^storeFile=' "$app_dir/android/key.properties" | cut -d= -f2- | tr -d '\r')"
-          test -f "$app_dir/android/$store_file" || {
-            echo "Keystore android/$store_file is missing in the source ZIP."
-            exit 1
-          }
-          echo "Keystore found: $store_file"
+          # Use an absolute path so Gradle cannot resolve the keystore against
+          # the wrong directory (android/ instead of android/app/).
+          cat > "$app_dir/android/key.properties" <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=$app_dir/android/app/abtinmaps.p12
+          EOF
 
+          echo 'Android signing configuration created from GitHub Secrets.'
           echo "APP_DIR=$app_dir" >> "$GITHUB_ENV"
           echo "APP_NAME=$APP_NAME" >> "$GITHUB_ENV"
 
@@ -345,6 +370,21 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: Validate Android keystore from GitHub Secrets
+        working-directory: ${{ env.APP_DIR }}
+        shell: bash
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          keytool -list -v \
+            -storetype PKCS12 \
+            -keystore "$APP_DIR/android/app/abtinmaps.p12" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" >/dev/null
+          echo 'GitHub Secrets keystore and alias validated successfully.'
 
       - name: Install required Android SDK components
         shell: bash
@@ -536,7 +576,7 @@ jobs:
 
 
   # ==================================================================
-  # IOS: IPA (signed if secrets exist, otherwise unsigned)
+  # IOS: signed IPA (all iOS signing secrets required)
   # ==================================================================
   ios:
     name: Build iOS IPA
@@ -604,17 +644,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ -n "$IOS_P12" ] && [ -n "$IOS_P12_PASSWORD" ] && [ -n "$IOS_PROFILE" ]; then
-            echo "signed=true" >> "$GITHUB_OUTPUT"
-            echo "iOS signing secrets found: building a SIGNED IPA."
-          else
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::iOS signing secrets not set: building an UNSIGNED IPA (for sideloading / re-signing only)."
+          if [ -z "$IOS_P12" ] || [ -z "$IOS_P12_PASSWORD" ] || [ -z "$IOS_PROFILE" ]; then
+            echo '::error::iOS signing requires IOS_CERTIFICATE_P12_BASE64, IOS_CERTIFICATE_PASSWORD and IOS_PROVISIONING_PROFILE_BASE64 GitHub Secrets.'
+            exit 1
           fi
+
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          echo "All iOS signing secrets are present; a signed IPA will be built."
 
       # ---------------- signed path ----------------
       - name: Install certificate and provisioning profile
-        if: steps.signing.outputs.signed == 'true'
         working-directory: ${{ env.APP_DIR }}
         shell: bash
         env:
@@ -723,7 +762,6 @@ jobs:
           echo "Method:     $EXPORT_METHOD"
 
       - name: Build signed IPA
-        if: steps.signing.outputs.signed == 'true'
         working-directory: ${{ env.APP_DIR }}
         shell: bash
         env:
@@ -741,28 +779,6 @@ jobs:
 
           mkdir -p release
           cp "${ipas[0]}" "release/${APP_NAME}-${TAG}.ipa"
-          ls -lh release/
-
-      # ---------------- unsigned path ----------------
-      - name: Build unsigned IPA
-        if: steps.signing.outputs.signed != 'true'
-        working-directory: ${{ env.APP_DIR }}
-        shell: bash
-        env:
-          TAG: ${{ inputs.tag }}
-        run: |
-          set -euo pipefail
-
-          flutter build ios --release --no-pub --no-codesign
-
-          app="build/ios/iphoneos/Runner.app"
-          test -d "$app" || { echo 'Runner.app was not produced.'; exit 1; }
-
-          rm -rf Payload
-          mkdir -p Payload release
-          cp -R "$app" Payload/
-          zip -9 -q -r "release/${APP_NAME}-${TAG}-unsigned.ipa" Payload
-          rm -rf Payload
           ls -lh release/
 
       - name: Remove temporary keychain and profile
@@ -811,43 +827,50 @@ jobs:
 
           title="${RELEASE_NAME:-$TAG}"
 
+          # Always point the tag at a clean source-only tree. This also fixes
+          # pre-existing tags whose automatic GitHub source archives may contain
+          # the original ZIP or signing material.
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          clean_zip="$(find dist -maxdepth 1 -type f -name '*-source.zip' -print -quit)"
+          test -n "$clean_zip" && test -s "$clean_zip" || {
+            echo 'Clean source ZIP is missing.'
+            exit 1
+          }
+
+          tree="$RUNNER_TEMP/clean-tag"
+          rm -rf "$tree"; mkdir -p "$tree"
+          unzip -q "$clean_zip" -d "$tree"
+
+          # Do not publish workflow files or signing material in the tag tree.
+          find "$tree" -type d -path '*/.github/workflows' -prune -exec rm -rf {} +
+          find "$tree" -type f \( \
+            -iname '*.p12' -o -iname '*.pfx' -o -iname '*.jks' -o -iname '*.keystore' \
+            -o -iname '*.pem' -o -iname '*.crt' -o -iname '*.cer' -o -iname '*.key' \
+            -o -iname '*.mobileprovision' -o -iname 'key.properties' \
+            -o -iname 'keystore.properties' -o -name 'local.properties' \
+          \) -delete
+
+          if find "$tree" -type f \( -iname '*.p12' -o -iname '*.pfx' -o -iname '*.jks' \
+                 -o -iname '*.keystore' -o -iname '*.pem' -o -iname '*.key' \
+                 -o -iname '*.mobileprovision' -o -iname 'key.properties' \
+                 -o -iname 'keystore.properties' \) | grep -q .; then
+            echo '::error::Signing material remains in the clean tag tree.'
+            exit 1
+          fi
+
+          cd "$tree"
+          git init -q -b clean-source
+          git config user.name  "github-actions"
+          git config user.email "github-actions@github.com"
+          git add -A
+          git commit -q -m "Clean source for $TAG (no signing files)"
+          git tag "$TAG"
+          git push --force "$remote" "refs/tags/$TAG"
+          cd - >/dev/null
+
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG exists: updating its files."
+            echo "Release $TAG exists: updating its files and clean source tag."
           else
-            # GitHub auto-attaches "Source code (zip/tar.gz)" = the repo at the tag.
-            # The repo contains the ORIGINAL source ZIP (with keystore), so tag a
-            # separate orphan commit that holds ONLY the clean source.
-            remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-
-            if git ls-remote --exit-code --tags "$remote" "refs/tags/$TAG" >/dev/null 2>&1; then
-              echo "::warning::Tag $TAG already exists: using it as is (its auto source archive may contain the original ZIP)."
-            else
-              clean_zip="$(ls dist/*-source.zip | head -n1)"
-              tree="$RUNNER_TEMP/clean-tag"
-              rm -rf "$tree"; mkdir -p "$tree"
-              unzip -q "$clean_zip" -d "$tree"
-
-              # GITHUB_TOKEN cannot push workflow files
-              find "$tree" -type d -path '*/.github/workflows' -prune -exec rm -rf {} +
-
-              # last safety net
-              if find "$tree" -type f \( -iname '*.p12' -o -iname '*.jks' -o -iname '*.keystore' \
-                     -o -iname '*.pem' -o -iname 'key.properties' \) | grep -q .; then
-                echo '::error::key file in clean tag tree'
-                exit 1
-              fi
-
-              cd "$tree"
-              git init -q -b clean-source
-              git config user.name  "github-actions"
-              git config user.email "github-actions@github.com"
-              git add -A
-              git commit -q -m "Clean source for $TAG (no signing files)"
-              git tag "$TAG"
-              git push "$remote" "refs/tags/$TAG"
-              cd - >/dev/null
-            fi
-
             gh release create "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
