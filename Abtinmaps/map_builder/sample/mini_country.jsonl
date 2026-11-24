@@ -1,0 +1,5 @@
+{"kind":"node","id":1,"lat":35.70,"lon":51.40,"tags":{"place":"city","name":"تهران","name:en":"Tehran","name:fa":"تهران"}}
+{"kind":"node","id":2,"lat":35.71,"lon":51.41,"tags":{"amenity":"hospital","name":"بیمارستان نمونه","name:en":"Sample Hospital","name:fa":"بیمارستان نمونه","opening_hours":"24/7"}}
+{"kind":"way","id":100,"node_ids":[10,11],"geometry":[[51.39,35.69],[51.42,35.72]],"tags":{"highway":"primary","name":"خیابان آزادی","name:en":"Azadi Street","name:fa":"خیابان آزادی","oneway":"yes","maxspeed":"60"}}
+{"kind":"way","id":101,"node_ids":[12,13,14,12],"geometry":[[51.40,35.70],[51.401,35.70],[51.401,35.701],[51.40,35.70]],"tags":{"building":"yes","building:levels":"4"}}
+{"kind":"way","id":102,"node_ids":[15,16,17,15],"geometry":[[51.402,35.70],[51.405,35.70],[51.405,35.703],[51.402,35.70]],"tags":{"landuse":"park"}}

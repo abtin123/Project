@@ -1,0 +1,41 @@
+# ساخت IPA «بدون امضا» (بدون گواهی/Provisioning Profile و بدون Secret).
+# فایل را در ریپوی گیت‌هاب به‌صورت .github/workflows/build-ios-unsigned.yml بگذارید.
+# فرض: پروژهٔ Flutter در ریشهٔ ریپو است (اگر داخل پوشه است، working-directory را عوض کنید).
+name: Build unsigned iOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.35.1"
+          cache: true
+
+      - name: Fetch packages
+        run: flutter pub get
+
+      - name: Build iOS (no code signing)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP="build/ios/iphoneos/Runner.app"
+          test -d "$APP" || { echo "Runner.app not found"; exit 1; }
+          rm -rf Payload abtin_maps-unsigned.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry abtin_maps-unsigned.ipa Payload
+          ls -lh abtin_maps-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: abtin_maps-unsigned-ipa
+          path: abtin_maps-unsigned.ipa
